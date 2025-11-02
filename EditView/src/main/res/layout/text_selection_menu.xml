@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/selection_menu_container"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@drawable/selection_menu_background"
+    android:elevation="8dp"
+    android:padding="4dp">
+
+    <!-- First-level items (horizontal) -->
+    <LinearLayout
+        android:id="@+id/first_level_container"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="4dp"
+        android:background="@android:color/transparent">
+
+        <!-- Dynamic buttons will be added programmatically -->
+    </LinearLayout>
+
+    <!-- Second-level items (vertical, hidden by default) -->
+    <LinearLayout
+        android:id="@+id/second_level_container"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:visibility="gone"
+        android:background="@android:color/white"
+        android:elevation="4dp"
+        android:padding="4dp">
+        <!-- Dynamic buttons will be added programmatically -->
+    </LinearLayout>
+
+</LinearLayout>
