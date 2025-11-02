@@ -2,11 +2,8 @@
     android:layout_width="fill_parent"
     android:layout_height="fill_parent"
     android:orientation="vertical">
-    
     <EditText
-        android:id="@+id/lineEdit"
-        android:layout_width="fill_parent"
-        android:layout_height="wrap_content"
-        android:inputType="number"/>
-    
+        android:id="@+id/pathEdit"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"/>
 </LinearLayout>
