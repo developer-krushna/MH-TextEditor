@@ -2,11 +2,16 @@
 
 A powerful, lightweight text editor for Android with syntax highlighting, smooth editing experience, and professional code editing features.
 
+> ⚠️ **Note:** This editor may not fully support some Android keyboards yet.  
+> Compatibility improvements are under active development as part of ongoing research.
+
 ---
 
 ## 📱 Screenshots
 
-*(Add screenshots of your editor here)*
+| ![Screenshot 1](https://raw.githubusercontent.com/developer-krushna/MH-TextEditor/refs/heads/main/java.jpg) | ![Screenshot 2](https://raw.githubusercontent.com/developer-krushna/MH-TextEditor/refs/heads/main/smali.jpg) |
+|------------------------------------------|------------------------------------------|
+| ![Screenshot 3](https://raw.githubusercontent.com/developer-krushna/MH-TextEditor/refs/heads/main/xml.jpg) | ![Screenshot 4](https://raw.githubusercontent.com/developer-krushna/MH-TextEditor/refs/heads/main/syntax_select.jpg) |
 
 ---
 
@@ -48,31 +53,27 @@ A powerful, lightweight text editor for Android with syntax highlighting, smooth
 
 ## 🚀 Getting Started
 
-### Installation
-
-Add the dependency to your `build.gradle`:
-
-```gradle
-dependencies {
-    implementation 'com.yourusername:mh-texteditor:1.0.0'
-}
-```
-
 ### Basic Usage
 
 ```xml
 <!-- In your layout XML -->
-<com.text.edit.editor.EditView
+<modder.hub.editor.EditView
     android:id="@+id/editView"
     android:layout_width="match_parent"
-    android:layout_height="match_parent" />
+    android:layout_height="match_parent"
+	android:layout_marginTop="0dp"
+    android:layout_marginStart="0dp"
+    android:paddingTop="0dp"
+    android:paddingStart="0dp" 
+    android:focusable="true"
+    android:focusableInTouchMode="true"/>
 ```
 
 ```java
 // In your Activity
 EditView editView = findViewById(R.id.editView);
 editView.setText("Your code here");
-editView.setSyntaxHighlightingEnabled(true);
+editView.setSyntaxLanguageFileName("java.json");
 ```
 
 ### Advanced Configuration
@@ -82,7 +83,6 @@ editView.setSyntaxHighlightingEnabled(true);
 editView.setTextSize(16); // in pixels
 
 // Enable features
-editView.setSyntaxHighlightingEnabled(true);
 editView.setMagnifierEnabled(true);
 editView.setAutoIndentEnabled(true);
 
@@ -162,15 +162,27 @@ Add custom syntax definition files in JSON format to extend language support:
 
 ```json
 {
-  "language": "java",
+  "name": ["Java", ".java", ".jsp"],
+  "comment": [
+    { "startsWith": "//" },
+    { "startsWith": "/*", "endsWith": "*/" }
+  ],
+
   "rules": [
+    // Single-line and multi-line comments
+    { "type": "comment", "regex": "//.*" },
+    { "type": "comment", "regex": "/\\*[\\s\\S]*?\\*/" },
+      // Triple-quoted strings
     {
-      "type": "keyword",
-      "pattern": "\\b(public|private|class|void)\\b",
-      "color": "#0000FF"
-    }
+      "regex": "\"\"\"[\\s\\S]*?\"\"\"",
+      "groupStyles": { "0": "string" }
+    },
+
+    // Quoted strings
+    { "type": "string", "regex": "\"(?:\\\\.|[^\"])*\"" },
+    { "type": "string", "regex": "'(?:\\\\.|[^'])'" }
   ]
-}
+}   
 ```
 
 ---
@@ -182,8 +194,7 @@ app/
 ├── editor/
 │   ├── EditView.java           # Main editor component
 │   ├── GapBuffer.java          # Efficient text storage
-│   ├── layout/
-│   │   └── WordWrapLayout.java # Word wrapping implementation
+│   ├── WordWrapLayout.java   # Word wrapping implementation
 │   ├── highlight/
 │   │   └── SyntaxConfig.java   # Syntax highlighting engine
 │   └── component/
