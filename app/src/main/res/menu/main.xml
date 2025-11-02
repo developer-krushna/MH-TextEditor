@@ -1,0 +1,44 @@
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <item
+        android:id="@+id/menu_undo"
+        android:orderInCategory="100"
+        android:title="undo"
+        android:showAsAction="always" />
+
+    <item
+        android:id="@+id/menu_redo"
+        android:orderInCategory="200"
+        android:title="redo"
+        android:showAsAction="always" />
+    
+    <item
+        android:id="@+id/menu_edit"
+        android:orderInCategory="300"
+        android:title="edit"
+        android:showAsAction="always" />
+    <item
+        android:id="@+id/menu_open"
+        android:orderInCategory="400"
+        android:title="@string/menu_open"
+        android:showAsAction="never" />
+
+    <item
+        android:id="@+id/menu_gotoline"
+        android:orderInCategory="500"
+        android:title="@string/menu_gotoline"
+        android:showAsAction="never" />
+	<item
+        android:id="@+id/menu_syntax"
+        android:orderInCategory="500"
+        android:title="Syntax"
+        android:showAsAction="never" />
+    <item
+        android:id="@+id/menu_save"
+        android:orderInCategory="700"
+        android:title="@string/menu_save"
+        android:showAsAction="never" />
+</menu>
+
