@@ -1,0 +1,14 @@
+<resources>
+    <string name="app_name">MH TextEditor</string>
+    <string name="menu_open">open</string>
+    <string name="menu_save">save</string>
+    <string name="menu_gotoline">gotoline</string>
+    <string name="menu_select_all">selectAll</string> 
+    <string name="menu_copy">copy</string>
+    <string name="menu_cut">cut</string>
+    <string name="menu_paste">paste</string>
+    <string name="menu_replaceFirst">replaceFirst</string>
+    <string name="menu_replaceAll">replaceAll</string>
+    <string name="menu_find_prev">prev</string>
+    <string name="menu_find_next">next</string>
+</resources>
