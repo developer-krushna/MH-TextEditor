@@ -1,0 +1,96 @@
+{
+  "name": ["XML", ".xml", ".kml", ".plist"],
+  "comment": { "startsWith": "<!--", "endsWith": "-->" },
+
+  "rules": [
+    // Comments (<!-- ... -->)
+    { "type": "comment", "regex": "<!--[\\s\\S]*?-->" },
+
+    // Opening tags with < and tag name (multi-line friendly)
+    {
+      "regex": "(<\\s*)([A-Za-z_][A-Za-z0-9:._\\-]*)",
+      "groupStyles": {
+        "1": "operator",
+        "2": "tagName"
+      }
+    },
+
+    // Closing tags with </ and >
+    {
+      "regex": "(</\\s*)([A-Za-z_][A-Za-z0-9:._\\-]*)(\\s*>)",
+      "groupStyles": {
+        "1": "operator",
+        "2": "tagName",
+        "3": "operator"
+      }
+    },
+
+    // Self-closing tags (<tag ... />)
+    {
+      "regex": "(<\\s*)([A-Za-z_][A-Za-z0-9:._\\-]*)([^>]*)(/?>)",
+      "groupStyles": {
+        "1": "operator",
+        "2": "tagName",
+        "4": "operator"
+      }
+    },
+
+    // XML declarations like <?xml version="1.0"?>
+    {
+      "regex": "(<\\?xml)([^?]*)(\\?>)",
+      "groupStyles": {
+        "1": "operator",
+        "2": "tagName",
+        "3": "operator"
+      }
+    },
+
+    // Namespaces (xmlns:android="...")
+    {
+      "regex": "(xmlns:)([A-Za-z0-9_\\-]+)",
+      "groupStyles": {
+        "1": "attrName",
+        "2": "namespace"
+      }
+    },
+
+    // Attribute names with optional namespace prefix
+    {
+      "regex": "(?:([A-Za-z0-9_\\-]+):)?([A-Za-z0-9_\\-]+)(?=\\s*=)",
+      "groupStyles": {
+        "1": "namespace",
+        "2": "attrName"
+      }
+    },
+
+    // Equal sign between name and value
+    { "type": "operator", "regex": "=" },
+
+    // Attribute values in quotes
+    {
+      "regex": "(?s)(['\"])(.*?)\\1",
+      "groupStyles": {
+        "0": "string",
+        "2": "propVal"
+      }
+    },
+
+    // Inline color codes (#RGB, #RRGGBB, #AARRGGBB)
+    {
+      "type": "number",
+      "regex": "(?<![;&])#(?:[A-Fa-f0-9]{3}|[A-Fa-f0-9]{6}|[A-Fa-f0-9]{8})\\b"
+    },
+
+    // Booleans
+    { "type": "number", "regex": "\\b(true|false)\\b" },
+
+    // Entities (&amp;, &lt;, etc.)
+    { "type": "constant", "regex": "&[A-Za-z]+;" },
+
+    // Operators like <, >, /, ?, :
+    { "type": "operator", "regex": "</?|/?>|:|\\?" },
+
+    // Default fallback
+    { "type": "default", "regex": "." }
+  ]
+}

@@ -1,0 +1,46 @@
+{
+  "name": ["Java", ".java", ".jsp"],
+  "comment": [
+    { "startsWith": "//" },
+    { "startsWith": "/*", "endsWith": "*/" }
+  ],
+
+  "rules": [
+    // Single-line and multi-line comments
+    { "type": "comment", "regex": "//.*" },
+    { "type": "comment", "regex": "/\\*[\\s\\S]*?\\*/" },
+
+    // Triple-quoted strings
+    {
+      "regex": "\"\"\"[\\s\\S]*?\"\"\"",
+      "groupStyles": { "0": "string" }
+    },
+
+    // Quoted strings
+    { "type": "string", "regex": "\"(?:\\\\.|[^\"])*\"" },
+    { "type": "string", "regex": "'(?:\\\\.|[^'])'" },
+
+    // Numbers
+    { "type": "number", "regex": "\\b\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?[fFdDlL]?\\b" },
+
+    // Annotations
+    { "type": "meta", "regex": "@\\w+(?:\\.\\w+)*" },
+
+    // Constants (all caps)
+    { "type": "constant", "regex": "\\b(?!(?:CRC32|URL)\\b)[A-Z][A-Z0-9]+\\b(?!\\.)(?!\\s{0,10}\\()" },
+    { "type": "constant", "regex": "\\b[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+\\b(?!\\.)(?!\\s{0,10}\\()" },
+
+    // Keywords
+    {
+      "type": "keyword",
+      "regex": "\\b(?:while|volatile|void|try|true|transient|throws|throw|this|synchronized|switch|super|strictfp|static|short|return|public|protected|private|package|null|new|native|long|interface|int|instanceof|import|implements|if|goto|for|float|finally|final|false|extends|enum|else|double|do|default|continue|const|class|char|catch|case|byte|break|boolean|assert|abstract|var|record|yield|sealed|non-sealed|permits|when)\\b"
+    },
+
+    // Operators
+    { "type": "operator", "regex": "[+\\-*/%=&|!<>^~?:]+|\\.|,|;|\\(|\\)|\\{|\\}" },
+
+    // Default fallback
+    { "type": "default", "regex": "." }
+  ]
+}
+
