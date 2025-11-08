@@ -360,7 +360,7 @@ public class ClipboardPanel {
                 // finishActionMode();
                 break;
             case 4: // Delete
-                _editView.deleteSelectedText();
+                _editView.delete();
                 // Only finish if you want to close after delete
                 // finishActionMode();
                 break;
@@ -377,11 +377,6 @@ public class ClipboardPanel {
         return clipboard != null && clipboard.hasPrimaryClip();
     }
 
-    private void finishActionMode() {
-        if (_clipboardActionMode != null) {
-            _clipboardActionMode.finish();
-        }
-    }
 
     private void startAutoHideTimer() {
         cancelAutoHideTimer();
