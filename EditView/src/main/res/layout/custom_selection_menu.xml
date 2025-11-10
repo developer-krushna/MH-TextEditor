@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/popupContainer"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@drawable/popup_background"
+    android:padding="0dp">
+
+    <!-- Primary Menu -->
+    <LinearLayout
+        android:id="@+id/primaryMenu"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:padding="0dp">
+
+        <!-- Menu items added dynamically -->
+
+    </LinearLayout>
+
+    <!-- Divider - Hidden by default -->
+    <View
+        android:id="@+id/divider"
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="#1A000000"
+        android:visibility="gone"
+        android:layout_marginHorizontal="8dp" />
+
+    <!-- Secondary Menu - Hidden by default -->
+    <LinearLayout
+        android:id="@+id/secondaryMenu"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:visibility="gone"
+        android:padding="0dp">
+
+        <!-- Menu items added dynamically -->
+
+    </LinearLayout>
+
+</LinearLayout>
