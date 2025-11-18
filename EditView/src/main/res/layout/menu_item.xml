@@ -9,7 +9,6 @@
     android:minWidth="56dp"
     android:clipChildren="false"
     android:clipToPadding="false">
-
     <ImageView
         android:id="@+id/menuIcon"
         android:layout_width="wrap_content"
@@ -20,7 +19,6 @@
         android:maxWidth="30dp"
         android:maxHeight="30dp"
         android:padding="2dp" />
-
     <TextView
         android:id="@+id/menuTitle"
         android:layout_width="wrap_content"
