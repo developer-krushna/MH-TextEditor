@@ -12,7 +12,8 @@ A powerful, lightweight text editor for Android with syntax highlighting, smooth
 | ![Screenshot 1](https://raw.githubusercontent.com/developer-krushna/MH-TextEditor/refs/heads/main/java.jpg) | ![Screenshot 2](https://raw.githubusercontent.com/developer-krushna/MH-TextEditor/refs/heads/main/smali.jpg) |
 |------------------------------------------|------------------------------------------|
 | ![Screenshot 3](https://raw.githubusercontent.com/developer-krushna/MH-TextEditor/refs/heads/main/xml.jpg) | ![Screenshot 4](https://raw.githubusercontent.com/developer-krushna/MH-TextEditor/refs/heads/main/syntax_select.jpg) |
-
+|------------------------------------------|------------------------------------------|
+| ![Screenshot 5](https://raw.githubusercontent.com/developer-krushna/MH-TextEditor/refs/heads/main/menu.jpg) | ![Screenshot 6](https://raw.githubusercontent.com/developer-krushna/MH-TextEditor/refs/heads/main/menu2.jpg) |
 ---
 
 ## ✨ Features
