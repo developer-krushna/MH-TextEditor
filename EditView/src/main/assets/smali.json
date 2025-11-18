@@ -14,6 +14,12 @@
       "regex": "^(\\s*)(\\.(?:end\\s+|restart\\s+)?[a-zA-Z_\\-]+)\\b"
     },
     
+    {
+  	  "type": "methodStart",
+  	  "regex": "(?m)^[ \t]*\\.method",
+  	  "lineBackground": "#FFEDED"
+	}, 
+    
      // ---------- Instructions ----------
     {
       "type": "keyword",
