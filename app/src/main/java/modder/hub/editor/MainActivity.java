@@ -2,9 +2,7 @@ package modder.hub.editor;
 
 import android.Manifest;
 import android.app.Activity;
-import android.app.ActivityManager;
 import android.app.AlertDialog;
-import android.content.Context;
 import android.content.DialogInterface;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
@@ -22,10 +20,6 @@ import android.view.View;
 import android.widget.EditText;
 import android.widget.ProgressBar;
 import android.widget.Toast;
-import modder.hub.editor.EditView;
-import modder.hub.editor.GapBuffer;
-import modder.hub.editor.OnTextChangedListener;
-import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileReader;
@@ -36,9 +30,11 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
+import modder.hub.editor.EditView;
+import modder.hub.editor.buffer.GapBuffer;
+import modder.hub.editor.listener.OnTextChangedListener;
 import org.mozilla.universalchardet.UniversalDetector;
-import android.text.TextWatcher;
-import android.text.Editable;
+
 
 public class MainActivity extends Activity {
 
@@ -347,7 +343,6 @@ public class MainActivity extends Activity {
 
                 // FIXED: Read entire file as single string (avoids incremental appends/gap shifts)
                 String fullText = readFile(path.toString());
-                ;
 
                 // Replace buffer wholesale (like setText, but async)
                 GapBuffer newBuffer = new GapBuffer(fullText);
