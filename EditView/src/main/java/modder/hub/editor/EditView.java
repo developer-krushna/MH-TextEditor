@@ -45,7 +45,6 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Rect;
 import android.graphics.Typeface;
-import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.os.Handler;
 import android.text.InputType;
@@ -58,6 +57,7 @@ import android.util.AttributeSet;
 import android.util.Log;
 import android.util.Pair;
 import android.view.GestureDetector;
+import android.view.HapticFeedbackConstants;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.ScaleGestureDetector;
@@ -68,30 +68,27 @@ import android.view.inputmethod.BaseInputConnection;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputConnection;
 import android.view.inputmethod.InputMethodManager;
-import android.widget.ActionMenuView.LayoutParams;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
-import android.widget.FrameLayout;
 import android.widget.ListPopupWindow;
-import android.widget.ListView;
-import android.widget.Magnifier;
 import android.widget.OverScroller;
+import android.widget.PopupWindow;
 import android.widget.TextView;
-import modder.hub.editor.R;
-import modder.hub.editor.ScreenUtils;
-import modder.hub.editor.component.ClipboardPanel;
-import modder.hub.editor.highlight.MHSyntaxHighlightEngine;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import android.widget.PopupWindow;
-import android.view.HapticFeedbackConstants;
+import modder.hub.editor.R;
+import modder.hub.editor.buffer.GapBuffer;
+import modder.hub.editor.component.ClipboardPanel;
+import modder.hub.editor.component.Magnifier;
+import modder.hub.editor.highlight.MHSyntaxHighlightEngine;
+import modder.hub.editor.listener.OnTextChangedListener;
+import modder.hub.editor.utils.ScreenUtils;
 
 /* Author : Krushna Chandra Maharna(@developer-krushna)
    This project was actually started by some one using gap buffer
@@ -113,6 +110,10 @@ import android.view.HapticFeedbackConstants;
 */
 
 public class EditView extends View {
+
+    private static final String COPYRIGHT = "MH-TextEditor\nCopyright (C) Krushna Chandra modder-hub@zohomail.in\nThis project is distributed under the LGPL v2.1 license";
+
+    private final String TAG = this.getClass().getSimpleName();
 
     // ---------- Fields (state, resources, helpers) ----------
     private Paint mPaint;
@@ -160,8 +161,6 @@ public class EditView extends View {
     private final int DEFAULT_DURATION = 250;
     // cursor blink BLINK_TIMEOUT 500ms
     private final int BLINK_TIMEOUT = 500;
-
-    private final String TAG = this.getClass().getSimpleName();
 
     // Magnifier
     private Magnifier mMagnifier;
@@ -266,6 +265,9 @@ public class EditView extends View {
     }
 
     private void initView(Context context) {
+        Log.v(TAG, COPYRIGHT);
+
+        // Initialize Gapbuffer
         mGapBuffer = new GapBuffer();
         mCursorLine = getLineCount();
         setBackgroundColor(Color.WHITE);
@@ -282,9 +284,7 @@ public class EditView extends View {
         mClipboardPanel = new ClipboardPanel(this);
 
         // Initialize magnifier
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
-            mMagnifier = new Magnifier(this);
-        }
+        mMagnifier = new Magnifier(this);
 
         // Reduce cursor width and make it responsive
         int density = (int) getResources().getDisplayMetrics().density;
@@ -407,12 +407,12 @@ public class EditView extends View {
                 adjustSelectRange(selectionStart, selectionEnd);
             }
             // Check if initial scroll is needed
-            if (getScrollY() > 0 || getScrollX() > 0) {
+            /*  if (getScrollY() > 0 || getScrollX() > 0) {
                 scrollToVisable();
             } else {
                 // Ensure we're at the top-left initially
                 scrollTo(0, 0);
-            }
+            }*/
         }
     }
 
@@ -444,9 +444,11 @@ public class EditView extends View {
     }
 
     // Draw the editor content (helper)
-    public void drawEditorContent(Canvas canvas) {
+    public void drawEditorContent(Canvas canvas, int captureTop, int captureBottom) {
         int saveCount = canvas.save();
         canvas.translate(getScrollX(), getScrollY());
+        drawMatchText(canvas);
+        drawLineBackground(canvas);
         drawEditableText(canvas);
         drawCursor(canvas);
         drawSelectHandle(canvas);
@@ -625,6 +627,7 @@ public class EditView extends View {
     }
 
     // Draw editable text lines with numbers and syntax highlighting
+
     public void drawEditableText(Canvas canvas) {
         int startLine = Math.max(canvas.getClipBounds().top / getLineHeight(), 1);
         int endLine = Math.min(canvas.getClipBounds().bottom / getLineHeight() + 1, getLineCount());
@@ -659,7 +662,7 @@ public class EditView extends View {
 
         // Margins
         int leftMargin = 10; // ✅ Space from left edge for line numbers
-        int rightMargin = 10; // Space between line numbers and separator
+        int rightMargin = 13; // Space between line numbers and separator
 
         for (int i = startLine; i <= endLine; i++) {
             int paintY = i * getLineHeight() - (int) mTextPaint.descent();
@@ -680,7 +683,16 @@ public class EditView extends View {
             lineWidth = Math.max(measureText(text), lineWidth);
 
             if (mHighlighter != null && text != null && !text.isEmpty()) {
-                mHighlighter.drawLine(canvas, text, i, contentStartX, paintY);
+                int lineHeight = getLineHeight();
+                int top = (i - 1) * lineHeight;
+                int bottom = i * lineHeight;
+                int left = getPaddingLeft() + getLineNumberWidth() + SPACEING;
+                int right = getScrollX() + getWidth();
+                // Special Cases, like for smali print method line bg
+                // Bugs : You cant see the selected visual when you select method line
+                mHighlighter.drawLineBackground(canvas, text, i, left, top, right, bottom);
+                // Draw line text
+                mHighlighter.drawLineText(canvas, text, i, contentStartX, paintY);
             } else {
                 mTextPaint.setColor(Color.BLACK);
                 canvas.drawText(text, contentStartX, paintY, mTextPaint);
@@ -1174,8 +1186,17 @@ public class EditView extends View {
 
         if (!mReplaceList.isEmpty())
             mReplaceList.clear();
-
+        smoothScrollTo(0, Math.max(getLineCount() * getLineHeight() - getHeight() + getLineHeight() * 2, 0));
+        showTextSelectionWindow();
         postInvalidate();
+    }
+
+    // Helper method to check if all texts are selected
+    public boolean isAllTextSelected() {
+        return selectionStart == 0 &&
+                selectionEnd == mGapBuffer.length() &&
+                selectionStart != selectionEnd &&
+                mGapBuffer.length() > 0;
     }
 
     // Clear selection and related UI
@@ -1221,6 +1242,16 @@ public class EditView extends View {
         return measureText(getLine(lineNumber));
     }
 
+    // Width of lines
+    public int getLineWidth() {
+        return lineWidth;
+    }
+
+    // Width of space
+    public int getSpaceWidth() {
+        return spaceWidth;
+    }
+
     // Get maximum scrollable X
     public int getMaxScrollX() {
         return Math.max(0, getLeftSpace() + lineWidth + spaceWidth * 4 - getWidth());
@@ -1248,71 +1279,66 @@ public class EditView extends View {
     // Show magnifier centered near content coords
     private void showMagnifier(float x, float y) {
         if (!mMagnifierEnabled || mMagnifier == null) return;
+        try {
+            hideTextSelectionWindow();
+            // Convert content coordinates to screen coordinates
+            float adjustedX = x - getScrollX();
+            float adjustedY = y - getScrollY();
 
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
-            try {
-                // Convert content coordinates to screen coordinates
-                float adjustedX = x - getScrollX();
-                float adjustedY = y - getScrollY();
+            // Adjust Y to center magnifier on the current line's text
+            float lineHeight = getLineHeight();
+            adjustedY -= lineHeight * 0.5f; // Center on the current line (baseline)
 
-                // Adjust Y to center magnifier on the current line's text
-                float lineHeight = getLineHeight();
-                adjustedY -= lineHeight * 0.5f; // Center on the current line (baseline)
+            // Account for padding and canvas translation
+            adjustedY += getPaddingTop();
 
-                // Account for padding and canvas translation
-                adjustedY += getPaddingTop();
+            // Ensure magnifier stays within view bounds
+            adjustedX = Math.max(50, Math.min(adjustedX, getWidth() - 50));
+            adjustedY = Math.max(50, Math.min(adjustedY, getHeight() - 50));
 
-                // Ensure magnifier stays within view bounds
-                adjustedX = Math.max(50, Math.min(adjustedX, getWidth() - 50));
-                adjustedY = Math.max(50, Math.min(adjustedY, getHeight() - 50));
+            // Debug logging
+            Log.d(TAG, "showMagnifier: x=" + adjustedX + ", y=" + adjustedY + ", rawX=" + x + ", rawY=" + y + ", scrollY=" + getScrollY() + ", lineHeight=" + lineHeight);
 
-                // Debug logging
-                Log.d(TAG, "showMagnifier: x=" + adjustedX + ", y=" + adjustedY + ", rawX=" + x + ", rawY=" + y + ", scrollY=" + getScrollY() + ", lineHeight=" + lineHeight);
-
-                mMagnifier.show(adjustedX, adjustedY);
-                mMagnifierX = adjustedX;
-                mMagnifierY = adjustedY;
-                mIsMagnifierShowing = true;
-            } catch (Exception e) {
-                Log.e(TAG, "Error showing magnifier: " + e.getMessage());
-                dismissMagnifier();
-            }
+            mMagnifier.show((int) adjustedX, (int) adjustedY);
+            mMagnifierX = adjustedX;
+            mMagnifierY = adjustedY;
+            mIsMagnifierShowing = true;
+        } catch (Exception e) {
+            Log.e(TAG, "Error showing magnifier: " + e.getMessage());
+            dismissMagnifier();
         }
     }
 
     // Update magnifier position smoothly
     private void updateMagnifier(float x, float y) {
         if (!mIsMagnifierShowing || !mMagnifierEnabled || mMagnifier == null) return;
+        try {
+            // Convert content coordinates to screen coordinates
+            float adjustedX = x - getScrollX();
+            float adjustedY = y - getScrollY();
 
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
-            try {
-                // Convert content coordinates to screen coordinates
-                float adjustedX = x - getScrollX();
-                float adjustedY = y - getScrollY();
+            // Adjust Y to center magnifier on the current line's text
+            float lineHeight = getLineHeight();
+            adjustedY -= lineHeight * 0.5f; // Center on the current line (baseline)
 
-                // Adjust Y to center magnifier on the current line's text
-                float lineHeight = getLineHeight();
-                adjustedY -= lineHeight * 0.5f; // Center on the current line (baseline)
+            // Account for padding and canvas translation
+            adjustedY += getPaddingTop();
 
-                // Account for padding and canvas translation
-                adjustedY += getPaddingTop();
+            // Ensure magnifier stays within view bounds
+            adjustedX = Math.max(50, Math.min(adjustedX, getWidth() - 50));
+            adjustedY = Math.max(50, Math.min(adjustedY, getHeight() - 50));
 
-                // Ensure magnifier stays within view bounds
-                adjustedX = Math.max(50, Math.min(adjustedX, getWidth() - 50));
-                adjustedY = Math.max(50, Math.min(adjustedY, getHeight() - 50));
+            // Smooth update only if significant movement
+            if (Math.abs(adjustedX - mMagnifierX) > 1 || Math.abs(adjustedY - mMagnifierY) > 1) {
+                Log.d(TAG, "updateMagnifier: x=" + adjustedX + ", y=" + adjustedY + ", rawX=" + x + ", rawY=" + y + ", scrollY=" + getScrollY() + ", lineHeight=" + lineHeight);
 
-                // Smooth update only if significant movement
-                if (Math.abs(adjustedX - mMagnifierX) > 1 || Math.abs(adjustedY - mMagnifierY) > 1) {
-                    Log.d(TAG, "updateMagnifier: x=" + adjustedX + ", y=" + adjustedY + ", rawX=" + x + ", rawY=" + y + ", scrollY=" + getScrollY() + ", lineHeight=" + lineHeight);
-
-                    mMagnifier.show(adjustedX, adjustedY);
-                    mMagnifierX = adjustedX;
-                    mMagnifierY = adjustedY;
-                }
-            } catch (Exception e) {
-                Log.e(TAG, "Error updating magnifier: " + e.getMessage());
-                dismissMagnifier();
+                mMagnifier.show((int) adjustedX, (int) adjustedY);
+                mMagnifierX = adjustedX;
+                mMagnifierY = adjustedY;
             }
+        } catch (Exception e) {
+            Log.e(TAG, "Error updating magnifier: " + e.getMessage());
+            dismissMagnifier();
         }
     }
 
@@ -1699,12 +1725,19 @@ public class EditView extends View {
     // Goto line number (1-based)
     public void gotoLine(int line) {
         line = Math.min(Math.max(line, 1), getLineCount());
+
+        // Clear any active selection to cancel it before navigating
+        if (isSelectMode) {
+            clearSelectionMenu();
+        }
+
         mCursorIndex = getLineStart(line);
         mCursorLine = line;
         mCursorPosX = getLeftSpace();
         mCursorPosY = (line - 1) * getLineHeight();
 
         smoothScrollTo(0, Math.max(line * getLineHeight() - getHeight() + getLineHeight() * 2, 0));
+        postInvalidate(); // Ensure immediate redraw after clearing selection
     }
 
     // Check undo available
@@ -1994,7 +2027,7 @@ public class EditView extends View {
         }
     }
 
-   // Show the autocomplete popup near the caret
+    // Show the autocomplete popup near the caret
     private void showAutoComplete(String prefix) {
         Rect cursorRect = getBoundingBox(mCursorIndex);
 
@@ -2002,7 +2035,7 @@ public class EditView extends View {
 
         // Calculate full width with margin
         int margin = (int) (getResources().getDisplayMetrics().density * 8); // 8dp margin on each
-                                                                             // side
+        // side
         int popupWidth = getWidth() - (margin * 2);
 
         // Dynamically size the height — wrap up to 4 visible items
@@ -2228,210 +2261,6 @@ public class EditView extends View {
             }
         };
 
-        // when on long press to select a word
-        private String findNearestWord() {
-            int length = mGapBuffer.length();
-            if (length == 0) return null;
-
-            if (mCursorIndex >= length) {
-                mCursorIndex = Math.max(0, length - 1);
-            }
-
-            if (isCurrentLineEmptyOrWhitespace()) {
-                return null;
-            }
-
-            // FIRST: Always try to find single special character
-            String selected = findSingleSpecialChar();
-            if (selected != null) return selected;
-
-            // SECOND: Then try word selection
-            selected = findWordAtCursor();
-            if (selected != null) return selected;
-
-            selected = findWordInVicinity();
-            if (selected != null) return selected;
-
-            selected = findAnyNonWhitespace();
-            return selected;
-        }
-
-        // Only select single special characters
-        private String findSingleSpecialChar() {
-            // Check current cursor position
-            if (mCursorIndex < mGapBuffer.length()) {
-                char currentChar = mGapBuffer.charAt(mCursorIndex);
-                if (isSpecialChar(currentChar)) {
-                    selectionStart = mCursorIndex;
-                    selectionEnd = mCursorIndex + 1;
-                    return String.valueOf(currentChar);
-                }
-            }
-
-            // Check position before cursor
-            if (mCursorIndex > 0) {
-                char prevChar = mGapBuffer.charAt(mCursorIndex - 1);
-                if (isSpecialChar(prevChar)) {
-                    selectionStart = mCursorIndex - 1;
-                    selectionEnd = mCursorIndex;
-                    return String.valueOf(prevChar);
-                }
-            }
-
-            return null;
-        }
-
-        // Special character detection
-        private boolean isSpecialChar(char c) {
-            // All special characters that should be selected individually
-            String specialChars = ":;\"\'`.,!?@#$%^&*()-+=[]{}<>/~|\\";
-            return specialChars.indexOf(c) >= 0;
-        }
-
-        // WORD selection only - stops at special characters
-        private String expandSelectionFrom(int position) {
-            int length = mGapBuffer.length();
-            if (position < 0 || position >= length) return null;
-
-            char startChar = mGapBuffer.charAt(position);
-
-            // If it's a special char, don't expand - let findSingleSpecialChar handle it
-            if (isSpecialChar(startChar)) {
-                return null;
-            }
-
-            // Expand left until whitespace OR special char
-            selectionStart = position;
-            while (selectionStart > 0) {
-                char c = mGapBuffer.charAt(selectionStart - 1);
-                if (Character.isWhitespace(c) || isSpecialChar(c)) break;
-                selectionStart--;
-            }
-
-            // Expand right until whitespace OR special char
-            selectionEnd = position;
-            while (selectionEnd < length) {
-                char c = mGapBuffer.charAt(selectionEnd);
-                if (Character.isWhitespace(c) || isSpecialChar(c)) break;
-                selectionEnd++;
-            }
-
-            if (selectionStart < selectionEnd) {
-                return mGapBuffer.substring(selectionStart, selectionEnd);
-            }
-
-            return null;
-        }
-
-        // Find word at cursor (EXCLUDING special chars)
-        private String findWordAtCursor() {
-            // First, check if cursor is directly on a WORD character (not special char)
-            if (mCursorIndex < mGapBuffer.length()) {
-                char currentChar = mGapBuffer.charAt(mCursorIndex);
-                if (!Character.isWhitespace(currentChar) && !isSpecialChar(currentChar)) {
-                    return expandSelectionFrom(mCursorIndex);
-                }
-            }
-
-            // Check character before cursor (only if it's a WORD character)
-            if (mCursorIndex > 0) {
-                char prevChar = mGapBuffer.charAt(mCursorIndex - 1);
-                if (!Character.isWhitespace(prevChar) && !isSpecialChar(prevChar)) {
-                    return expandSelectionFrom(mCursorIndex - 1);
-                }
-            }
-
-            return null;
-        }
-
-        // Find word in vicinity (EXCLUDING special chars)
-        private String findWordInVicinity() {
-            int length = mGapBuffer.length();
-            if (length == 0) return null;
-
-            for (int radius = 1; radius <= 20; radius++) {
-                // Check forward
-                int forwardPos = mCursorIndex + radius;
-                if (forwardPos < length) {
-                    char c = mGapBuffer.charAt(forwardPos);
-                    // If it's a special char, select it individually
-                    if (isSpecialChar(c)) {
-                        selectionStart = forwardPos;
-                        selectionEnd = forwardPos + 1;
-                        return String.valueOf(c);
-                    }
-                    // If it's a word char (not special, not whitespace), expand word
-                    if (!Character.isWhitespace(c) && !isSpecialChar(c)) {
-                        return expandSelectionFrom(forwardPos);
-                    }
-                }
-
-                // Check backward
-                int backwardPos = mCursorIndex - radius;
-                if (backwardPos >= 0) {
-                    char c = mGapBuffer.charAt(backwardPos);
-                    // If it's a special char, select it individually
-                    if (isSpecialChar(c)) {
-                        selectionStart = backwardPos;
-                        selectionEnd = backwardPos + 1;
-                        return String.valueOf(c);
-                    }
-                    // If it's a word char (not special, not whitespace), expand word
-                    if (!Character.isWhitespace(c) && !isSpecialChar(c)) {
-                        return expandSelectionFrom(backwardPos);
-                    }
-                }
-            }
-
-            return null;
-        }
-
-        // Find any non-whitespace (but still respect special chars)
-        private String findAnyNonWhitespace() {
-            // Check if current line is empty first
-            String currentLine = getLine(mCursorLine);
-            if (currentLine == null || currentLine.trim().isEmpty()) {
-                return null;
-            }
-
-            int lineStart = getLineStart(mCursorLine);
-            int lineEnd = lineStart + getLine(mCursorLine).length();
-
-            for (int i = lineStart; i < lineEnd; i++) {
-                if (i < mGapBuffer.length()) {
-                    char c = mGapBuffer.charAt(i);
-                    if (!Character.isWhitespace(c)) {
-                        // If it's a special char, select only that char
-                        if (isSpecialChar(c)) {
-                            selectionStart = i;
-                            selectionEnd = i + 1;
-                            return String.valueOf(c);
-                        }
-                        // Otherwise expand word (will stop at special chars)
-                        return expandSelectionFrom(i);
-                    }
-                }
-            }
-
-            return null;
-        }
-
-        //  helper method to check line is empty or not
-        private boolean isCurrentLineEmptyOrWhitespace() {
-            String currentLine = getLine(mCursorLine);
-            if (currentLine == null || currentLine.isEmpty()) {
-                return true;
-            }
-
-            // Check if line contains only whitespace
-            for (int i = 0; i < currentLine.length(); i++) {
-                if (!Character.isWhitespace(currentLine.charAt(i))) {
-                    return false;
-                }
-            }
-            return true;
-        }
-
         // Swap left/right select handle coordinates and selection indices
         private void reverse() {
             selectHandleLeftX = selectHandleLeftX ^ selectHandleRightX;
@@ -2485,11 +2314,6 @@ public class EditView extends View {
         public boolean onDown(MotionEvent e) {
             float x = e.getX() + getScrollX();
             float y = e.getY() + getScrollY();
-
-            if (isInLineNumberArea(x, y)) {
-                mInitialLine = getLineFromY(y);
-                return true;
-            }
 
             // touch handle middle (show clipboard panel)
             if (mHandleMiddleVisable &&
@@ -2552,8 +2376,6 @@ public class EditView extends View {
             try {
                 float x = e2.getX() + getScrollX();
                 float y = e2.getY() + getScrollY();
-
-                // Handle line selection scrolling
 
                 if (mIsMagnifierActive && mMagnifierEnabled) {
                     if (touchOnSelectHandleMiddle) {
@@ -2641,13 +2463,10 @@ public class EditView extends View {
                 setCursorPosition(x, y);
                 postInvalidate();
                 mLastTapTime = System.currentTimeMillis();
+                // clear long selection process
+                clearLineSelection();
                 // cursor start blink
                 postDelayed(blinkAction, BLINK_TIMEOUT);
-
-                // Only hide if we're definitely not selecting
-                if (!isSelectMode) {
-                    hideTextSelectionWindow();
-                }
             }
 
             return super.onSingleTapUp(e);
@@ -2723,14 +2542,10 @@ public class EditView extends View {
             mCursorVisiable = mHandleMiddleVisable = true;
             showTextSelectionWindow();
 
-            if (isInLineNumberArea(x, y)) {
-                return true;
-            }
-
             if (!touchOnSelectHandleMiddle && mGapBuffer.length() > 0) {
                 setCursorPosition(x, y);
 
-                String selectWord = findNearestWord(); // This now uses the improved version
+                String selectWord = findNearestWord();
                 if (selectWord != null) {
                     removeCallbacks(blinkAction);
                     mCursorVisiable = mHandleMiddleVisable = false;
@@ -2743,11 +2558,6 @@ public class EditView extends View {
                     selectHandleLeftY = selectHandleRightY = mCursorPosY + getLineHeight();
 
                     setCursorPosition(selectionEnd);
-
-                    if (mMagnifierEnabled) {
-                        mIsMagnifierActive = true;
-                        showMagnifier(selectHandleRightX, selectHandleRightY);
-                    }
 
                     // Show what was selected (for debugging)
                     Log.d(TAG, "Double tap selected: '" + selectWord + "'");
@@ -2790,10 +2600,6 @@ public class EditView extends View {
                 selectSingleLine(currentLine);
                 mFirstSelectedLine = currentLine;
                 mWaitingForSecondSelection = true;
-
-                // Set timeout to clear if no second selection
-                mSelectionHandler.removeCallbacks(mClearSelectionRunnable);
-                mSelectionHandler.postDelayed(mClearSelectionRunnable, 3000); // 3 second timeout
 
                 // Show visual hint that we're waiting for second selection
                 showSelectionHint();
@@ -2909,6 +2715,239 @@ public class EditView extends View {
         updateSelectionHandles();
         showTextSelectionWindow();
         postInvalidate();
+    }
+
+    // clear long selection process
+    private void clearLineSelection() {
+        mWaitingForSecondSelection = false;
+        mFirstSelectedLine = -1;
+    }
+
+    // Helper method that used for selecting nearby word or special symbol
+    public void selectNearestWord() {
+        String selectWord = findNearestWord();
+        if (selectWord != null) {
+            removeCallbacks(blinkAction);
+            mCursorVisiable = false;
+            mHandleMiddleVisable = false;
+            isSelectMode = true;
+            mIsLineSelectionMode = true;
+
+            int left = getLeftSpace();
+            int lineStart = getLineStart(mCursorLine);
+            selectHandleLeftX = left + measureText(mGapBuffer.substring(lineStart, selectionStart));
+            selectHandleRightX = left + measureText(mGapBuffer.substring(lineStart, selectionEnd));
+            selectHandleLeftY = selectHandleRightY = mCursorPosY + getLineHeight();
+
+            setCursorPosition(selectHandleLeftX, selectHandleRightX);
+            setCursorPosition(selectionEnd);
+            showTextSelectionWindow();
+        }
+        postInvalidate();
+    }
+
+    // when on long press to select a word
+    public String findNearestWord() {
+        int length = mGapBuffer.length();
+        if (length == 0) return null;
+
+        if (mCursorIndex >= length) {
+            mCursorIndex = Math.max(0, length - 1);
+        }
+
+        if (isCurrentLineEmptyOrWhitespace()) {
+            return null;
+        }
+
+        // FIRST: Always try to find single special character
+        String selected = findSingleSpecialChar();
+        if (selected != null) return selected;
+
+        // SECOND: Then try word selection
+        selected = findWordAtCursor();
+        if (selected != null) return selected;
+
+        selected = findWordInVicinity();
+        if (selected != null) return selected;
+
+        selected = findAnyNonWhitespace();
+        return selected;
+    }
+
+    // Only select single special characters
+    private String findSingleSpecialChar() {
+        // Check current cursor position
+        if (mCursorIndex < mGapBuffer.length()) {
+            char currentChar = mGapBuffer.charAt(mCursorIndex);
+            if (isSpecialChar(currentChar)) {
+                selectionStart = mCursorIndex;
+                selectionEnd = mCursorIndex + 1;
+                return String.valueOf(currentChar);
+            }
+        }
+
+        // Check position before cursor
+        if (mCursorIndex > 0) {
+            char prevChar = mGapBuffer.charAt(mCursorIndex - 1);
+            if (isSpecialChar(prevChar)) {
+                selectionStart = mCursorIndex - 1;
+                selectionEnd = mCursorIndex;
+                return String.valueOf(prevChar);
+            }
+        }
+
+        return null;
+    }
+
+    // Special character detection
+    private boolean isSpecialChar(char c) {
+        // All special characters that should be selected individually
+        String specialChars = ":;\"\'`.,!?@#$%^&*()-+=[]{}<>/~|\\";
+        return specialChars.indexOf(c) >= 0;
+    }
+
+    // WORD selection only - stops at special characters
+    private String expandSelectionFrom(int position) {
+        int length = mGapBuffer.length();
+        if (position < 0 || position >= length) return null;
+
+        char startChar = mGapBuffer.charAt(position);
+
+        // If it's a special char, don't expand - let findSingleSpecialChar handle it
+        if (isSpecialChar(startChar)) {
+            return null;
+        }
+
+        // Expand left until whitespace OR special char
+        selectionStart = position;
+        while (selectionStart > 0) {
+            char c = mGapBuffer.charAt(selectionStart - 1);
+            if (Character.isWhitespace(c) || isSpecialChar(c)) break;
+            selectionStart--;
+        }
+
+        // Expand right until whitespace OR special char
+        selectionEnd = position;
+        while (selectionEnd < length) {
+            char c = mGapBuffer.charAt(selectionEnd);
+            if (Character.isWhitespace(c) || isSpecialChar(c)) break;
+            selectionEnd++;
+        }
+
+        if (selectionStart < selectionEnd) {
+            return mGapBuffer.substring(selectionStart, selectionEnd);
+        }
+
+        return null;
+    }
+
+    // Find word at cursor (EXCLUDING special chars)
+    private String findWordAtCursor() {
+        // First, check if cursor is directly on a WORD character (not special char)
+        if (mCursorIndex < mGapBuffer.length()) {
+            char currentChar = mGapBuffer.charAt(mCursorIndex);
+            if (!Character.isWhitespace(currentChar) && !isSpecialChar(currentChar)) {
+                return expandSelectionFrom(mCursorIndex);
+            }
+        }
+
+        // Check character before cursor (only if it's a WORD character)
+        if (mCursorIndex > 0) {
+            char prevChar = mGapBuffer.charAt(mCursorIndex - 1);
+            if (!Character.isWhitespace(prevChar) && !isSpecialChar(prevChar)) {
+                return expandSelectionFrom(mCursorIndex - 1);
+            }
+        }
+
+        return null;
+    }
+
+    // Find word in vicinity (EXCLUDING special chars)
+    private String findWordInVicinity() {
+        int length = mGapBuffer.length();
+        if (length == 0) return null;
+
+        for (int radius = 1; radius <= 20; radius++) {
+            // Check forward
+            int forwardPos = mCursorIndex + radius;
+            if (forwardPos < length) {
+                char c = mGapBuffer.charAt(forwardPos);
+                // If it's a special char, select it individually
+                if (isSpecialChar(c)) {
+                    selectionStart = forwardPos;
+                    selectionEnd = forwardPos + 1;
+                    return String.valueOf(c);
+                }
+                // If it's a word char (not special, not whitespace), expand word
+                if (!Character.isWhitespace(c) && !isSpecialChar(c)) {
+                    return expandSelectionFrom(forwardPos);
+                }
+            }
+
+            // Check backward
+            int backwardPos = mCursorIndex - radius;
+            if (backwardPos >= 0) {
+                char c = mGapBuffer.charAt(backwardPos);
+                // If it's a special char, select it individually
+                if (isSpecialChar(c)) {
+                    selectionStart = backwardPos;
+                    selectionEnd = backwardPos + 1;
+                    return String.valueOf(c);
+                }
+                // If it's a word char (not special, not whitespace), expand word
+                if (!Character.isWhitespace(c) && !isSpecialChar(c)) {
+                    return expandSelectionFrom(backwardPos);
+                }
+            }
+        }
+
+        return null;
+    }
+
+    // Find any non-whitespace (but still respect special chars)
+    private String findAnyNonWhitespace() {
+        // Check if current line is empty first
+        String currentLine = getLine(mCursorLine);
+        if (currentLine == null || currentLine.trim().isEmpty()) {
+            return null;
+        }
+
+        int lineStart = getLineStart(mCursorLine);
+        int lineEnd = lineStart + getLine(mCursorLine).length();
+
+        for (int i = lineStart; i < lineEnd; i++) {
+            if (i < mGapBuffer.length()) {
+                char c = mGapBuffer.charAt(i);
+                if (!Character.isWhitespace(c)) {
+                    // If it's a special char, select only that char
+                    if (isSpecialChar(c)) {
+                        selectionStart = i;
+                        selectionEnd = i + 1;
+                        return String.valueOf(c);
+                    }
+                    // Otherwise expand word (will stop at special chars)
+                    return expandSelectionFrom(i);
+                }
+            }
+        }
+
+        return null;
+    }
+
+    //  helper method to check line is empty or not
+    private boolean isCurrentLineEmptyOrWhitespace() {
+        String currentLine = getLine(mCursorLine);
+        if (currentLine == null || currentLine.isEmpty()) {
+            return true;
+        }
+
+        // Check if line contains only whitespace
+        for (int i = 0; i < currentLine.length(); i++) {
+            if (!Character.isWhitespace(currentLine.charAt(i))) {
+                return false;
+            }
+        }
+        return true;
     }
 
     // ===== SCALE GESTURE LISTENER CLASS =====
