@@ -332,6 +332,7 @@ public class EditView extends View {
 
         requestFocus();
         setFocusable(true);
+        setFocusableInTouchMode(true);
         postDelayed(blinkAction, BLINK_TIMEOUT);
 
         mAutoCompletePopup = new ListPopupWindow(getContext());
@@ -709,6 +710,7 @@ public class EditView extends View {
     public boolean onTouchEvent(MotionEvent event) {
         // Reset auto-hide timer on any touch
         if (event.getAction() == MotionEvent.ACTION_DOWN) {
+            requestFocus();
             resetAutoHideTimer();
         }
 
@@ -1004,6 +1006,18 @@ public class EditView extends View {
         return mGapBuffer.getLineOffset(lineNumber);
     }
 
+    // Get the last line offset of a line
+    private int getLineEnd(int line) {
+        int nextLine = line + 1;
+
+        if (nextLine > getLineCount()) {
+            // last line → return end of buffer
+            return mGapBuffer.length();
+        }
+
+        return getLineStart(nextLine) - 1; // end before newline
+    }
+
     // Find which line an offset is on
     private int getOffsetLine(int offset) {
         return mGapBuffer.findLineNumber(offset);
@@ -1022,6 +1036,15 @@ public class EditView extends View {
     // Width needed to draw line numbers
     private int getLineNumberWidth() {
         return measureText(Integer.toString(getLineCount()));
+    }
+
+    // get the column where the cursor is placed
+    public int getColumn() {
+        if (mCursorLine < 1 || mCursorLine > getLineCount()) {
+            return 0;
+        }
+        int lineStart = getLineStart(mCursorLine);
+        return mCursorIndex - lineStart;
     }
 
     // Helper used by clipboard panel to show selection
@@ -1059,15 +1082,57 @@ public class EditView extends View {
         return "";
     }
 
+    // Getting the selected text length
+    public int getSelectionLength() {
+        if (!isSelectMode) return 0;
+        return selectionEnd - selectionStart;
+    }
+
     // Insert text at caret, with auto-indent, autocomplete, and blinking handling
     public void insertText(String text) {
-        if (text != null) {
+        if (text == null || text.isEmpty()) return;
+
+        int insertAt = mCursorIndex;
+
+        // If selection exists → replace it
+        if (isSelectMode && selectionStart != selectionEnd) {
+
+            int s = Math.min(selectionStart, selectionEnd);
+            int e = Math.max(selectionStart, selectionEnd);
+
+            mGapBuffer.beginBatchEdit();
+            mGapBuffer.markSelectionBefore(selectionStart, selectionEnd, true);
+
+            // Replace selection in one undo-able step
+            mGapBuffer.replace(s, e, text, true);
+
+            // Set new cursor after inserted text
+            insertAt = s + text.length();
+            isSelectMode = false;
+            selectionStart = selectionEnd = -1;
+
+            mGapBuffer.markSelectionAfter(insertAt, insertAt, false);
+            mGapBuffer.endBatchEdit();
+
+        } else {
+
+            // No selection → simple insert with undo snapshot
+            mGapBuffer.beginBatchEdit();
+            mGapBuffer.markSelectionBefore(mCursorIndex, mCursorIndex, false);
+
             mGapBuffer.insert(mCursorIndex, text, true);
-            mCursorIndex += text.length();
-            adjustCursorPosition();
-            scrollToVisable();
-            postInvalidate();
+            insertAt = mCursorIndex + text.length();
+
+            mGapBuffer.markSelectionAfter(insertAt, insertAt, false);
+            mGapBuffer.endBatchEdit();
         }
+
+        mCursorIndex = insertAt;
+        mCursorLine = getOffsetLine(mCursorIndex);
+
+        adjustCursorPosition();
+        scrollToVisable();
+        postInvalidate();
     }
 
     // Selection getters
@@ -1361,8 +1426,20 @@ public class EditView extends View {
         mHighlighter = new MHSyntaxHighlightEngine(getContext(), mTextPaint, languageFile, isSyntaxDarkMode);
     }
 
+    // Syntax dark mode helper
     public void setSyntaxDarkMode(boolean isDark) {
         isSyntaxDarkMode = isDark;
+    }
+
+    // Get syntax comment block of exists
+    public String getCommentBlock() {
+        String block = mHighlighter.getCommentSyntaxBlock();
+        if (block == null) return "";
+        return block;
+    }
+
+    public void setMenuStyle(ClipboardPanel.MenuDisplayMode mode) {
+        mClipboardPanel.setMenuDisplayMode(mode);
     }
 
     // ---------- Scrolling Helpers ----------
@@ -1650,7 +1727,7 @@ public class EditView extends View {
     }
 
     // Move to previous match
-    public void prev() {
+    public void previous() {
         int currIndex = current();
         int prev = --currIndex;
         if (prev < 0) {
@@ -1759,6 +1836,23 @@ public class EditView extends View {
             adjustCursorPosition();
             onTextChanged();
             scrollToVisable();
+
+            // restore selection (GapBuffer exposes the snapshot)
+            int s = mGapBuffer.getLastUndoSelectionStart();
+            int e = mGapBuffer.getLastUndoSelectionEnd();
+            boolean mode = mGapBuffer.getLastUndoSelectionMode();
+
+            if (s >= 0 && e >= 0) {
+                selectionStart = Math.max(0, Math.min(s, mGapBuffer.length()));
+                selectionEnd = Math.max(0, Math.min(e, mGapBuffer.length()));
+                isSelectMode = mode;
+                updateSelectionHandles();
+            } else {
+                // no selection snapshot stored for this undo — clear selection
+                isSelectMode = false;
+                selectionStart = selectionEnd = -1;
+            }
+            postInvalidate();
         }
     }
 
@@ -1771,6 +1865,22 @@ public class EditView extends View {
             adjustCursorPosition();
             onTextChanged();
             scrollToVisable();
+
+            // restore selection for redo
+            int s = mGapBuffer.getLastRedoSelectionStart();
+            int e = mGapBuffer.getLastRedoSelectionEnd();
+            boolean mode = mGapBuffer.getLastRedoSelectionMode();
+
+            if (s >= 0 && e >= 0) {
+                selectionStart = Math.max(0, Math.min(s, mGapBuffer.length()));
+                selectionEnd = Math.max(0, Math.min(e, mGapBuffer.length()));
+                isSelectMode = mode;
+                updateSelectionHandles();
+            } else {
+                isSelectMode = false;
+                selectionStart = selectionEnd = -1;
+            }
+            postInvalidate();
         }
     }
 
@@ -1863,6 +1973,15 @@ public class EditView extends View {
         int width = measureText(text);
         mCursorPosX = getLeftSpace() + width;
         mCursorPosY = (mCursorLine - 1) * getLineHeight();
+    }
+
+    // Set selection of texts from start to end
+    private void setSelection(int start, int end) {
+        selectionStart = Math.max(0, Math.min(start, mGapBuffer.length()));
+        selectionEnd = Math.max(0, Math.min(end, mGapBuffer.length()));
+        isSelectMode = true;
+        mHandleMiddleVisable = false;
+        updateSelectionHandles();
     }
 
     // Set cursor position by pixel coordinates and compute nearest index
@@ -2948,6 +3067,787 @@ public class EditView extends View {
             }
         }
         return true;
+    }
+
+    // ===== Editor Custom Functionalities ===== //
+
+    // copy line texts
+    public void copyLine() {
+        if (isSelectMode) {
+            int[] sel = normalizeSelection();
+            int s = sel[0], e = sel[1];
+            int[] range = fullLineRangeForSelection(s, e);
+            if (range != null) {
+                copyRangeToClipboard(range[0], range[1], "lines");
+                return;
+            }
+            // degenerate -> fallthrough to no-selection behavior
+        }
+
+        // no selection path: copy current line and select it in UI
+        int[] range = fullLineRangeForCursorLine(mCursorLine);
+        copyRangeToClipboard(range[0], range[1], "line");
+        setSelection(range[0], range[1]);
+    }
+
+    // cut line texts
+    public void cutLine() {
+        if (isSelectMode) {
+            int[] sel = normalizeSelection();
+            int s = sel[0], e = sel[1];
+            int[] range = fullLineRangeForSelection(s, e);
+            if (range != null) {
+                // copy then delete as a batch (single undo)
+                copyRangeToClipboard(range[0], range[1], "lines");
+                batchDeleteWithSelectionSnapshot(range[0], range[1],
+                true, selectionStart, selectionEnd,
+                false, -1, -1);
+                clearSelection();
+                mCursorIndex = range[0];
+                mCursorLine = getOffsetLine(mCursorIndex);
+                adjustCursorPosition();
+                onTextChanged();
+                postInvalidate();
+                return;
+            }
+            // degenerate -> fallthrough to single-line cut
+        }
+
+        // no selection: cut current line
+        int[] range = fullLineRangeForCursorLine(mCursorLine);
+        copyRangeToClipboard(range[0], range[1], "line");
+        batchDeleteWithSelectionSnapshot(range[0], range[1],
+        false, selectionStart, selectionEnd,
+        false, -1, -1);
+        mCursorIndex = range[0];
+        mCursorLine = getOffsetLine(mCursorIndex);
+        adjustCursorPosition();
+        clearSelectionMenu();
+        onTextChanged();
+        postInvalidate();
+    }
+
+    // Replace line with clipboard text
+    public void replaceLine() {
+        if (!mClipboard.hasPrimaryClip()) return;
+        ClipData data = mClipboard.getPrimaryClip();
+        if (data == null || data.getItemCount() == 0) return;
+        ClipData.Item item = data.getItemAt(0);
+        CharSequence raw = item.getText();
+        if (raw == null) return;
+        String clipboardText = raw.toString();
+
+        if (isSelectMode) {
+            int[] sel = normalizeSelection();
+            int s = sel[0], e = sel[1];
+            int[] range = fullLineRangeForSelection(s, e);
+            if (range != null) {
+                int replaceStart = range[0];
+                int replaceEnd = range[1];
+                batchReplaceWithSelectionSnapshot(replaceStart, replaceEnd, clipboardText,
+                true, selectionStart, selectionEnd,
+                true, replaceStart, replaceStart + clipboardText.length());
+                // update UI to reflect selection of replaced block
+                setSelection(replaceStart, replaceStart + clipboardText.length());
+                clearSelectionMenu(); // optional; original logic kept
+                mCursorIndex = selectionEnd;
+                mCursorLine = getOffsetLine(mCursorIndex);
+                adjustCursorPosition();
+                onTextChanged();
+                postInvalidate();
+                return;
+            }
+            // degenerate -> fallthrough
+        }
+
+        // no selection: replace current line content
+        int[] range = fullLineRangeForCursorLine(mCursorLine);
+        int lineStart = range[0];
+        int lineEnd = range[1];
+        batchReplaceWithSelectionSnapshot(lineStart, lineEnd, clipboardText,
+        false, selectionStart, selectionEnd,
+        false, -1, -1);
+        clearSelection();
+        mCursorIndex = lineStart + clipboardText.length();
+        mCursorLine = getOffsetLine(mCursorIndex);
+        adjustCursorPosition();
+        onTextChanged();
+        postInvalidate();
+    }
+
+    // clear line texts
+    public void deleteLine() {
+        if (isSelectMode) {
+            int[] sel = normalizeSelection();
+            int s = sel[0], e = sel[1];
+            int[] range = fullLineRangeForSelection(s, e);
+            if (range != null) {
+                batchDeleteWithSelectionSnapshot(range[0], range[1],
+                true, selectionStart, selectionEnd,
+                false, -1, -1);
+                clearSelection();
+                mCursorIndex = Math.min(range[0], mGapBuffer.length());
+                mCursorLine = getOffsetLine(mCursorIndex);
+                adjustCursorPosition();
+                onTextChanged();
+                postInvalidate();
+                return;
+            }
+            // degenerate -> fallthrough
+        }
+
+        // no selection: delete current line
+        int[] range = fullLineRangeForCursorLine(mCursorLine);
+        batchDeleteWithSelectionSnapshot(range[0], range[1],
+        false, selectionStart, selectionEnd,
+        false, -1, -1);
+        mCursorIndex = Math.min(range[0], mGapBuffer.length());
+        mCursorLine = getOffsetLine(mCursorIndex);
+        adjustCursorPosition();
+        clearSelectionMenu();
+        onTextChanged();
+        postInvalidate();
+    }
+
+    // Clear line texts but keep line number
+    public void emptyLine() {
+        if (isSelectMode) {
+            int[] sel = normalizeSelection();
+            int s = sel[0], e = sel[1];
+            int[] range = fullLineRangeForSelection(s, e);
+            if (range != null) {
+                // delete each line's content but keep newlines (we delete content range per-line)
+                mGapBuffer.markSelectionBefore(selectionStart, selectionEnd, true);
+                mGapBuffer.beginBatchEdit();
+                int firstLine = getOffsetLine(s);
+                int lastLine = getOffsetLine(Math.max(0, e - 1));
+                for (int line = firstLine; line <= lastLine; line++) {
+                    int start = getLineStart(line);
+                    int end = start + getLine(line).length();
+                    if (end > start) {
+                        mGapBuffer.delete(start, end, true);
+                    }
+                }
+                mGapBuffer.markSelectionAfter(-1, -1, false);
+                mGapBuffer.endBatchEdit();
+
+                clearSelection();
+                mCursorLine = getOffsetLine(range[0]);
+                mCursorIndex = getLineStart(mCursorLine);
+                adjustCursorPosition();
+                onTextChanged();
+                postInvalidate();
+                return;
+            }
+            // degenerate -> fallthrough
+        }
+
+        // no selection: empty current line
+        int[] range = fullLineRangeForCursorLine(mCursorLine);
+        int lineStart = range[0];
+        int lineEnd = range[1];
+        if (lineEnd > lineStart) {
+            mGapBuffer.beginBatchEdit();
+            mGapBuffer.delete(lineStart, lineEnd, true);
+            mGapBuffer.endBatchEdit();
+        }
+        mCursorIndex = lineStart;
+        adjustCursorPosition();
+        clearSelectionMenu();
+        onTextChanged();
+        postInvalidate();
+    }
+
+    public void duplicateLine() {
+        // --- CASE 1: Selection Mode ---
+        if (isSelectMode) {
+
+            int start = Math.min(selectionStart, selectionEnd);
+            int end = Math.max(selectionStart, selectionEnd);
+
+            // Expand selection to full lines
+            int startLine = getOffsetLine(start);
+            int endLine = getOffsetLine(end);
+
+            int lineStart = getLineStart(startLine);
+            int lineEnd = getLineEnd(endLine);
+
+            String block = mGapBuffer.substring(lineStart, lineEnd);
+
+            // Insert duplicated block (ALWAYS add newline before block)
+            mGapBuffer.insert(lineEnd, "\n" + block, true);
+
+            // Reselect duplicated block
+            int dupStart = lineEnd + 1;
+            int dupEnd = dupStart + block.length();
+
+            selectionStart = dupStart;
+            selectionEnd = dupEnd;
+
+            updateSelectionHandles();
+            onTextChanged();
+            postInvalidate();
+            return;
+        }
+
+        // --- CASE 2: No Selection (Cursor only) ---
+        int currentLine = mCursorLine;
+
+        int lineStart = getLineStart(currentLine);
+        int lineEnd = getLineEnd(currentLine);
+
+        String lineText = mGapBuffer.substring(lineStart, lineEnd);
+
+        // Insert duplicated line
+        mGapBuffer.insert(lineEnd, "\n" + lineText, true);
+
+        // Maintain cursor column
+        int col = getColumn();
+
+        // Move cursor to new duplicated line
+        int newLine = currentLine + 1;
+        int newLineStart = getLineStart(newLine);
+
+        int target = newLineStart + col;
+
+        // Clamp column if line shorter
+        int newLineEnd = getLineEnd(newLine);
+        if (target > newLineEnd) {
+            target = newLineEnd;
+        }
+
+        // APPLY cursor move
+        setCursorPosition(target);
+
+        // Ensure no selection mode active
+        isSelectMode = false;
+        clearLineSelection();
+
+        onTextChanged();
+        postInvalidate();
+    }
+
+    // Case conversion methods
+    public void convertSelectionToLowerCase() {
+        if (isSelectMode) {
+            // normalize & clamp selection (defensive)
+            int s = Math.max(0, Math.min(selectionStart, selectionEnd));
+            int e = Math.max(0, Math.max(selectionStart, selectionEnd));
+            if (s == e) return;
+
+            String selectedText = mGapBuffer.substring(s, e);
+            if (selectedText != null && !selectedText.isEmpty()) {
+                String lowerCaseText = selectedText.toLowerCase();
+
+                mGapBuffer.beginBatchEdit(); // <<< group undo
+                mGapBuffer.replace(s, e, lowerCaseText, true);
+                mGapBuffer.endBatchEdit(); // <<< end group
+
+                // update selection to cover replaced text (handles length changes)
+                selectionStart = s;
+                selectionEnd = s + lowerCaseText.length();
+
+                // clamp
+                selectionStart = Math.max(0, Math.min(selectionStart, mGapBuffer.length()));
+                selectionEnd = Math.max(0, Math.min(selectionEnd, mGapBuffer.length()));
+
+                updateSelectionHandles();
+            }
+        } else {
+            // no selection: operate on current line
+            int lineStart = getLineStart(mCursorLine);
+            String currentLine = getLine(mCursorLine);
+            if (currentLine != null && !currentLine.isEmpty()) {
+                String lowerCaseText = currentLine.toLowerCase();
+
+                mGapBuffer.beginBatchEdit();
+                mGapBuffer.replace(lineStart, lineStart + currentLine.length(), lowerCaseText, true);
+                mGapBuffer.endBatchEdit();
+
+                clearSelectionMenu();
+
+                // move cursor to end of the replaced line
+                mCursorIndex = lineStart + lowerCaseText.length();
+                mCursorLine = getOffsetLine(mCursorIndex);
+                adjustCursorPosition();
+            }
+        }
+        onTextChanged();
+        postInvalidate();
+    }
+
+    public void convertSelectionToUpperCase() {
+        if (isSelectMode) {
+            // normalize & clamp selection (defensive)
+            int s = Math.max(0, Math.min(selectionStart, selectionEnd));
+            int e = Math.max(0, Math.max(selectionStart, selectionEnd));
+            if (s == e) return;
+
+            String selectedText = mGapBuffer.substring(s, e);
+            if (selectedText != null && !selectedText.isEmpty()) {
+                String upperCaseText = selectedText.toUpperCase();
+
+                mGapBuffer.beginBatchEdit(); // <<< group undo
+                mGapBuffer.replace(s, e, upperCaseText, true);
+                mGapBuffer.endBatchEdit(); // <<< end group
+
+                // update selection to cover replaced text (handles length changes)
+                selectionStart = s;
+                selectionEnd = s + upperCaseText.length();
+
+                // clamp
+                selectionStart = Math.max(0, Math.min(selectionStart, mGapBuffer.length()));
+                selectionEnd = Math.max(0, Math.min(selectionEnd, mGapBuffer.length()));
+
+                updateSelectionHandles();
+            }
+        } else {
+            // no selection: operate on current line
+            int lineStart = getLineStart(mCursorLine);
+            String currentLine = getLine(mCursorLine);
+            if (currentLine != null && !currentLine.isEmpty()) {
+                String upperCaseText = currentLine.toUpperCase();
+
+                mGapBuffer.beginBatchEdit();
+                mGapBuffer.replace(lineStart, lineStart + currentLine.length(), upperCaseText, true);
+                mGapBuffer.endBatchEdit();
+
+                clearSelectionMenu();
+
+                // move cursor to end of the replaced line
+                mCursorIndex = lineStart + upperCaseText.length();
+                mCursorLine = getOffsetLine(mCursorIndex);
+                adjustCursorPosition();
+            }
+        }
+        onTextChanged();
+        postInvalidate();
+    }
+
+// Indentation methods
+    public void increaseIndent() {
+        mGapBuffer.beginBatchEdit(); // UNDO batch start
+
+        if (isSelectMode) {
+            int startLine = getOffsetLine(selectionStart);
+            int endLine = getOffsetLine(selectionEnd);
+
+            for (int i = startLine; i <= endLine; i++) {
+                int lineStart = getLineStart(i);
+                mGapBuffer.insert(lineStart, "    ", true); // record in undo
+            }
+
+            int indentSize = 4;
+            selectionStart += indentSize;
+            selectionEnd += (endLine - startLine + 1) * indentSize;
+            updateSelectionHandles();
+        } else {
+            int lineStart = getLineStart(mCursorLine);
+            mGapBuffer.insert(lineStart, "    ", true);
+
+            mCursorIndex += 4;
+            adjustCursorPosition();
+            clearSelectionMenu();
+        }
+
+        mGapBuffer.endBatchEdit(); // UNDO batch end
+
+        // Restore selection state after undo/redo cycles
+        if (isSelectMode) {
+            selectionStart = Math.min(mGapBuffer.length(), selectionStart);
+            selectionEnd = Math.min(mGapBuffer.length(), selectionEnd);
+            updateSelectionHandles();
+        } else {
+            isSelectMode = false;
+        }
+
+        onTextChanged();
+        postInvalidate();
+    }
+
+    // Decrease indent
+    public void decreaseIndent() {
+        if (!isSelectMode) {
+            // single-line path
+            mGapBuffer.beginBatchEdit();
+
+            int lineStart = getLineStart(mCursorLine);
+            String line = getLine(mCursorLine);
+
+            int spacesToRemove = 0;
+            if (line.startsWith("    ")) spacesToRemove = 4;
+            else if (line.startsWith("  ")) spacesToRemove = 2;
+            else if (line.startsWith("\t")) spacesToRemove = 1;
+            else if (line.startsWith(" ")) spacesToRemove = 1;
+
+            if (spacesToRemove > 0) {
+                mGapBuffer.delete(lineStart, lineStart + spacesToRemove, true);
+                mCursorIndex = Math.max(0, mCursorIndex - spacesToRemove);
+                adjustCursorPosition();
+            }
+
+            mGapBuffer.endBatchEdit();
+            onTextChanged();
+            postInvalidate();
+            return;
+        }
+
+        // --- Multi-line selection
+        int selStartOrig = Math.max(0, Math.min(selectionStart, selectionEnd));
+        int selEndOrig = Math.max(0, Math.max(selectionStart, selectionEnd));
+
+        int startLine = getOffsetLine(selStartOrig);
+        int endLine = getOffsetLine(selEndOrig == 0 ? 0 : Math.max(0, selEndOrig - 1));
+        // build snapshot of line starts and text BEFORE any edits
+        int lineCount = endLine - startLine + 1;
+        int[] lineStarts = new int[lineCount];
+        String[] lineTexts = new String[lineCount];
+
+        for (int i = 0; i < lineCount; i++) {
+            int lineNo = startLine + i;
+            lineStarts[i] = getLineStart(lineNo);
+            lineTexts[i] = getLine(lineNo);
+        }
+
+        mGapBuffer.beginBatchEdit();
+
+        int totalRemoved = 0; // cumulative removed so far (affects later delete positions)
+
+        for (int i = 0; i < lineCount; i++) {
+            int origLineStart = lineStarts[i];
+            String line = lineTexts[i];
+
+            int spacesToRemove = 0;
+            if (line.startsWith("    ")) spacesToRemove = 4;
+            else if (line.startsWith("  ")) spacesToRemove = 2;
+            else if (line.startsWith("\t")) spacesToRemove = 1;
+            else if (line.startsWith(" ")) spacesToRemove = 1;
+            else continue; // nothing to remove on this line
+
+            // delete position must be adjusted by how many chars we removed earlier
+            int deleteStart = origLineStart - totalRemoved;
+            // defensive clamp
+            deleteStart = Math.max(0, Math.min(deleteStart, mGapBuffer.length()));
+
+            mGapBuffer.delete(deleteStart, deleteStart + spacesToRemove, true);
+
+            // update cumulative removed
+            totalRemoved += spacesToRemove;
+
+            // adjust original selection endpoints relative to original line starts:
+            // if the deleted area was strictly before the original selection start/end, shift them
+            // left
+            if (origLineStart < selStartOrig)
+                selStartOrig = Math.max(0, selStartOrig - spacesToRemove);
+            if (origLineStart < selEndOrig) selEndOrig = Math.max(0, selEndOrig - spacesToRemove);
+        }
+
+        mGapBuffer.endBatchEdit();
+
+        // Apply adjusted selection values and clamp to buffer
+        selectionStart = Math.max(0, Math.min(selStartOrig, mGapBuffer.length()));
+        selectionEnd = Math.max(0, Math.min(selEndOrig, mGapBuffer.length()));
+        updateSelectionHandles();
+
+        onTextChanged();
+        postInvalidate();
+    }
+
+    // Add Comment
+    public void toggleComment() {
+        // Determine the affected lines depending on selection mode
+        int startLine, endLine;
+
+        if (isSelectMode) {
+            // ensure selection indices are normalized and clamped
+            int s = Math.max(0, Math.min(selectionStart, selectionEnd));
+            int e = Math.max(0, Math.max(selectionStart, selectionEnd));
+            startLine = getOffsetLine(s);
+            endLine = getOffsetLine(e == 0 ? 0 : Math.max(0, e - 1)); // ensure we pick the line
+            // that contains e-1
+        } else {
+            // single line: operate only on cursor line
+            startLine = endLine = mCursorLine;
+        }
+
+        mGapBuffer.beginBatchEdit(); // group all changes into one undo step
+
+        boolean allCommented = true;
+        for (int i = startLine; i <= endLine; i++) {
+            String line = getLine(i);
+            if (!isLineCommented(line) && !line.trim().isEmpty()) {
+                allCommented = false;
+                break;
+            }
+        }
+
+        // If all lines are commented -> remove, else add comments for uncommented lines
+        for (int i = startLine; i <= endLine; i++) {
+            String line = getLine(i);
+            if (allCommented) {
+                // only remove if commented
+                if (isLineCommented(line)) {
+                    removeCommentFromLine(i);
+                }
+            } else {
+                // add comment if not commented and not blank
+                if (!isLineCommented(line) && !line.trim().isEmpty()) {
+                    addCommentToLine(i);
+                }
+            }
+        }
+
+        mGapBuffer.endBatchEdit(); // end grouping
+
+        // After editing, update UI and selection/cursor
+        if (isSelectMode) {
+            // Keep selection mode, but selection offsets were adjusted in add/remove helpers.
+            updateSelectionHandles();
+        } else {
+            clearSelectionMenu();
+            adjustCursorPosition();
+        }
+
+        onTextChanged();
+        postInvalidate();
+    }
+
+    private boolean isLineCommented(String line) {
+        if (line == null || line.isEmpty()) return false;
+
+        // Find the position after leading whitespace
+        int contentStart = 0;
+        while (contentStart < line.length() && Character.isWhitespace(line.charAt(contentStart))) {
+            contentStart++;
+        }
+
+        // Check if there's a comment after whitespace
+        return contentStart < line.length() && line.charAt(contentStart) == '#';
+    }
+
+    public void addComment() {
+        if (isSelectMode) {
+            int s = Math.max(0, Math.min(selectionStart, selectionEnd));
+            int e = Math.max(0, Math.max(selectionStart, selectionEnd));
+            int startLine = getOffsetLine(s);
+            int endLine = getOffsetLine(e == 0 ? 0 : Math.max(0, e - 1));
+
+            mGapBuffer.beginBatchEdit();
+            for (int i = startLine; i <= endLine; i++) {
+                String line = getLine(i);
+                if (!isLineCommented(line) && !line.trim().isEmpty()) {
+                    addCommentToLine(i);
+                }
+            }
+            mGapBuffer.endBatchEdit();
+
+            updateSelectionHandles();
+        } else {
+            String line = getLine(mCursorLine);
+            if (!isLineCommented(line) && !line.trim().isEmpty()) {
+                mGapBuffer.beginBatchEdit();
+                addCommentToLine(mCursorLine);
+                mGapBuffer.endBatchEdit();
+            }
+            clearSelectionMenu();
+            adjustCursorPosition();
+        }
+        onTextChanged();
+        postInvalidate();
+    }
+
+    public void removeComment() {
+        if (isSelectMode) {
+            int s = Math.max(0, Math.min(selectionStart, selectionEnd));
+            int e = Math.max(0, Math.max(selectionStart, selectionEnd));
+            int startLine = getOffsetLine(s);
+            int endLine = getOffsetLine(e == 0 ? 0 : Math.max(0, e - 1));
+
+            mGapBuffer.beginBatchEdit();
+            for (int i = startLine; i <= endLine; i++) {
+                String line = getLine(i);
+                if (isLineCommented(line)) {
+                    removeCommentFromLine(i);
+                }
+            }
+            mGapBuffer.endBatchEdit();
+
+            updateSelectionHandles();
+        } else {
+            String line = getLine(mCursorLine);
+            if (isLineCommented(line)) {
+                mGapBuffer.beginBatchEdit();
+                removeCommentFromLine(mCursorLine);
+                mGapBuffer.endBatchEdit();
+            }
+            clearSelectionMenu();
+            adjustCursorPosition();
+        }
+        onTextChanged();
+        postInvalidate();
+    }
+
+    private void addCommentToLine(int lineNumber) {
+        int lineStart = getLineStart(lineNumber);
+        String line = getLine(lineNumber);
+
+        if (line == null || line.trim().isEmpty() || isLineCommented(line)) return;
+
+        int contentStart = 0;
+        while (contentStart < line.length() && Character.isWhitespace(line.charAt(contentStart))) {
+            contentStart++;
+        }
+
+        int insertPos = lineStart + contentStart; // logical offset where comment marker should be
+        // inserted
+
+        // Insert marker and capture undo
+        mGapBuffer.insert(insertPos, getCommentBlock() + " ", true);
+
+        // If selection exists, shift selection indices forward when they are at/after insert
+        if (isSelectMode) {
+            // Use >= so selection that starts exactly at insert will include the inserted text
+            if (selectionStart >= insertPos) selectionStart += 2;
+            if (selectionEnd >= insertPos) selectionEnd += 2;
+            // clamp
+            selectionStart = Math.max(0, Math.min(selectionStart, mGapBuffer.length()));
+            selectionEnd = Math.max(0, Math.min(selectionEnd, mGapBuffer.length()));
+        } else {
+            // If single-line and cursor is on the same line, advance cursor offset so cursor stays
+            // after inserted marker
+            int cursorOffset = getLineStart(lineNumber) + contentStart;
+            // if you keep cursor as an offset, update it here; otherwise adjust mCursorLine related
+            // state via adjustCursorPosition()
+            // (call adjustCursorPosition() at the caller after editing)
+        }
+    }
+
+    private void removeCommentFromLine(int lineNumber) {
+        int lineStart = getLineStart(lineNumber);
+        String line = getLine(lineNumber);
+
+        if (line == null || line.isEmpty()) return;
+
+        int contentStart = 0;
+        while (contentStart < line.length() &&
+                Character.isWhitespace(line.charAt(contentStart))) {
+            contentStart++;
+        }
+
+        String block = getCommentBlock();
+        int blockLen = block.length();
+
+        // check if line starts with comment block
+        if (contentStart + blockLen <= line.length() &&
+                line.startsWith(block, contentStart)) {
+
+            int deleteStart = lineStart + contentStart;
+            int deleteEnd = deleteStart + blockLen;
+
+            // If there is a space after the comment, delete that too
+            int nextCharIndex = contentStart + blockLen;
+            if (nextCharIndex < line.length() && line.charAt(nextCharIndex) == ' ') {
+                deleteEnd++; // remove the extra space
+            }
+
+            mGapBuffer.delete(deleteStart, deleteEnd, true);
+
+            // update selection
+            int removedCount = deleteEnd - deleteStart;
+
+            if (isSelectMode) {
+                if (selectionStart > deleteStart) selectionStart -= removedCount;
+                if (selectionEnd > deleteStart) selectionEnd -= removedCount;
+
+                selectionStart = Math.max(0, Math.min(selectionStart, mGapBuffer.length()));
+                selectionEnd = Math.max(0, Math.min(selectionEnd, mGapBuffer.length()));
+            }
+        }
+    }
+
+    // Normalize and clamp selection; returns [start, end] with start<=end
+    private int[] normalizeSelection() {
+        int s = Math.max(0, Math.min(selectionStart, selectionEnd));
+        int e = Math.max(0, Math.max(selectionStart, selectionEnd));
+        s = Math.max(0, Math.min(s, mGapBuffer.length()));
+        e = Math.max(0, Math.min(e, mGapBuffer.length()));
+        return new int[]{s, e};
+    }
+
+    // Compute full-line range [startOffset, endOffset] that covers selection [s,e].
+    // If e==s this returns null (degenerate).
+    // endOffset is content-end (not including trailing newline) for last line.
+    private int[] fullLineRangeForSelection(int s, int e) {
+        if (s >= e) return null;
+        int firstLine = getOffsetLine(s);
+        int lastLine = getOffsetLine(Math.max(0, e - 1));
+        int start = getLineStart(firstLine);
+        int lastLineStart = getLineStart(lastLine);
+        int end = lastLineStart + getLine(lastLine).length(); // content-end
+        start = Math.max(0, Math.min(start, mGapBuffer.length()));
+        end = Math.max(0, Math.min(end, mGapBuffer.length()));
+        if (start > end) end = start;
+        return new int[]{start, end};
+    }
+
+// Compute full-line range for the current cursor line (no newline included).
+    private int[] fullLineRangeForCursorLine(int line) {
+        int start = getLineStart(line);
+        int end = start + getLine(line).length();
+        start = Math.max(0, Math.min(start, mGapBuffer.length()));
+        end = Math.max(0, Math.min(end, mGapBuffer.length()));
+        if (start > end) end = start;
+        return new int[]{start, end};
+    }
+
+// Helper: mark selection before, begin batch, run replace once, mark after, end batch.
+// keepSelectAfter indicates whether to set selection to [outStart, outEnd] after replace
+    private void batchReplaceWithSelectionSnapshot(int replaceStart, int replaceEnd, String text,
+            boolean wasSelectBefore, int selBeforeStart, int selBeforeEnd,
+            boolean setSelectionAfter, int selAfterStart, int selAfterEnd) {
+        mGapBuffer.markSelectionBefore(selBeforeStart, selBeforeEnd, wasSelectBefore);
+        mGapBuffer.beginBatchEdit();
+        mGapBuffer.replace(replaceStart, replaceEnd, text, true);
+        if (setSelectionAfter) {
+            mGapBuffer.markSelectionAfter(selAfterStart, selAfterEnd, true);
+        } else {
+            mGapBuffer.markSelectionAfter(-1, -1, false);
+        }
+        mGapBuffer.endBatchEdit();
+    }
+
+    // Helper: delete a range with selection snapshot grouping
+    private void batchDeleteWithSelectionSnapshot(int delStart, int delEnd,
+            boolean wasSelectBefore, int selBeforeStart, int selBeforeEnd,
+            boolean setSelectionAfter, int selAfterStart, int selAfterEnd) {
+        mGapBuffer.markSelectionBefore(selBeforeStart, selBeforeEnd, wasSelectBefore);
+        mGapBuffer.beginBatchEdit();
+        mGapBuffer.delete(delStart, delEnd, true);
+        if (setSelectionAfter) {
+            mGapBuffer.markSelectionAfter(selAfterStart, selAfterEnd, true);
+        } else {
+            mGapBuffer.markSelectionAfter(-1, -1, false);
+        }
+        mGapBuffer.endBatchEdit();
+    }
+
+    // Helper: copy a buffer-range to clipboard
+    private void copyRangeToClipboard(int start, int end, String label) {
+        start = Math.max(0, Math.min(start, mGapBuffer.length()));
+        end = Math.max(0, Math.min(end, mGapBuffer.length()));
+        if (start > end) end = start;
+        String text = mGapBuffer.substring(start, end);
+        if (text != null && !text.isEmpty()) {
+            ClipData data = ClipData.newPlainText(label, text);
+            mClipboard.setPrimaryClip(data);
+        }
+    }
+
+    // Helper: clear selection UI (common)
+    private void clearSelection() {
+        clearSelectionMenu();
+        isSelectMode = false;
+        selectionStart = selectionEnd = -1;
     }
 
     // ===== SCALE GESTURE LISTENER CLASS =====
