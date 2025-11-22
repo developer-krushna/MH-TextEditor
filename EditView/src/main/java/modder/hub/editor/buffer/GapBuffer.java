@@ -20,6 +20,15 @@ public class GapBuffer implements CharSequence {
     private BufferCache _cache;
     private UndoStack _undoStack;
 
+    // Selection snapshots produced by last undo/redo
+    private int _lastUndoSelStart = -1;
+    private int _lastUndoSelEnd = -1;
+    private boolean _lastUndoSelMode = false;
+
+    private int _lastRedoSelStart = -1;
+    private int _lastRedoSelEnd = -1;
+    private boolean _lastRedoSelMode = false;
+
     private final int EOF = '\uFFFF';
     private final int NEWLINE = '\n';
 
@@ -553,11 +562,60 @@ public class GapBuffer implements CharSequence {
     }
 
     public int undo() {
-        return _undoStack.undo();
+        // clear last redo snapshot (avoid stale)
+        _lastUndoSelStart = _lastUndoSelEnd = -1;
+        _lastUndoSelMode = false;
+        int pos = _undoStack.undo();
+        // _undoStack will fill _lastUndo* fields (via inner class)
+        return pos;
     }
 
     public int redo() {
-        return _undoStack.redo();
+        _lastRedoSelStart = _lastRedoSelEnd = -1;
+        _lastRedoSelMode = false;
+        int pos = _undoStack.redo();
+        return pos;
+    }
+
+    /**
+     * Editor should call this BEFORE starting an operation (or batch). This tells the undo stack
+     * what the selection was before the edit.
+     */
+    public void markSelectionBefore(int selStart, int selEnd, boolean selMode) {
+        _undoStack.setPendingSelectionBefore(selStart, selEnd, selMode);
+    }
+
+    /**
+     * Editor should call this AFTER finishing an operation (or batch). This lets the undo stack
+     * record the selection state after edit.
+     */
+    public void markSelectionAfter(int selStart, int selEnd, boolean selMode) {
+        _undoStack.setPendingSelectionAfter(selStart, selEnd, selMode);
+    }
+
+    // getters for editor to read the selection restored by last undo/redo
+    public int getLastUndoSelectionStart() {
+        return _lastUndoSelStart;
+    }
+
+    public int getLastUndoSelectionEnd() {
+        return _lastUndoSelEnd;
+    }
+
+    public boolean getLastUndoSelectionMode() {
+        return _lastUndoSelMode;
+    }
+
+    public int getLastRedoSelectionStart() {
+        return _lastRedoSelStart;
+    }
+
+    public int getLastRedoSelectionEnd() {
+        return _lastRedoSelEnd;
+    }
+
+    public boolean getLastRedoSelectionMode() {
+        return _lastRedoSelMode;
     }
 
     public void beginBatchEdit() {
@@ -584,9 +642,18 @@ public class GapBuffer implements CharSequence {
         private LinkedList<Action> _stack = new LinkedList<>();
 
         private static final int MAX_UNDO_SIZE = 50000; // Max chars per undo action (~100KB);
-                                                        // adjust as needed
+        // adjust as needed
 
         public final long MERGE_TIME = 1000000000;
+
+        // Pending selection snapshots (set by GapBuffer.markSelectionBefore/After)
+        private int _pendingSelBeforeStart = -1;
+        private int _pendingSelBeforeEnd = -1;
+        private boolean _pendingSelBeforeMode = false;
+
+        private int _pendingSelAfterStart = -1;
+        private int _pendingSelAfterEnd = -1;
+        private boolean _pendingSelAfterMode = false;
 
         /**
          * Undo the previous insert/delete operation
@@ -608,6 +675,14 @@ public class GapBuffer implements CharSequence {
                     action.undo();
                     _top--;
                 } while (canUndo());
+
+                // After undoing the group, tell outer GapBuffer what selection to restore:
+                // Use the 'before' snapshot of the last undone action (represents state prior to
+                // the group)
+                _lastUndoSelStart = lastUndo._selBeforeStart;
+                _lastUndoSelEnd = lastUndo._selBeforeEnd;
+                _lastUndoSelMode = lastUndo._selBeforeMode;
+
                 return lastUndo.findUndoPosition();
             }
             return -1;
@@ -634,9 +709,27 @@ public class GapBuffer implements CharSequence {
                     _top++;
                 } while (canRedo());
 
+                // After redoing the group, use the 'after' snapshot of the last redone action
+                _lastRedoSelStart = lastRedo._selAfterStart;
+                _lastRedoSelEnd = lastRedo._selAfterEnd;
+                _lastRedoSelMode = lastRedo._selAfterMode;
+
                 return lastRedo.findRedoPosition();
             }
             return -1;
+        }
+
+        // setters used by GapBuffer.markSelectionBefore/After
+        public void setPendingSelectionBefore(int s, int e, boolean mode) {
+            _pendingSelBeforeStart = s;
+            _pendingSelBeforeEnd = e;
+            _pendingSelBeforeMode = mode;
+        }
+
+        public void setPendingSelectionAfter(int s, int e, boolean mode) {
+            _pendingSelAfterStart = s;
+            _pendingSelAfterEnd = e;
+            _pendingSelAfterMode = mode;
         }
 
         /**
@@ -662,7 +755,17 @@ public class GapBuffer implements CharSequence {
             }
 
             if (!mergeSuccess && len <= MAX_UNDO_SIZE) {
-                push(new InsertAction(start, end, _groupId));
+                InsertAction a = new InsertAction(start, end, _groupId);
+                // copy pending selection-before into action
+                a._selBeforeStart = _pendingSelBeforeStart;
+                a._selBeforeEnd = _pendingSelBeforeEnd;
+                a._selBeforeMode = _pendingSelBeforeMode;
+                // also copy pending selection-after (if editor already set it)
+                a._selAfterStart = _pendingSelAfterStart;
+                a._selAfterEnd = _pendingSelAfterEnd;
+                a._selAfterMode = _pendingSelAfterMode;
+
+                push(a);
 
                 if (!_isBatchEdit) {
                     _groupId++;
@@ -690,7 +793,16 @@ public class GapBuffer implements CharSequence {
             }
 
             if (!mergeSuccess && len <= MAX_UNDO_SIZE) {
-                push(new DeleteAction(start, end, _groupId));
+                DeleteAction a = new DeleteAction(start, end, _groupId);
+                a._selBeforeStart = _pendingSelBeforeStart;
+                a._selBeforeEnd = _pendingSelBeforeEnd;
+                a._selBeforeMode = _pendingSelBeforeMode;
+
+                a._selAfterStart = _pendingSelAfterStart;
+                a._selAfterEnd = _pendingSelAfterEnd;
+                a._selAfterMode = _pendingSelAfterMode;
+
+                push(a);
 
                 if (!_isBatchEdit) {
                     _groupId++;
@@ -743,6 +855,16 @@ public class GapBuffer implements CharSequence {
             public int _group;
             /* 750ms in nanoseconds */
             public final long MERGE_TIME = 750000000L; // Fixed to 750ms as per comment
+
+            // Selection snapshot BEFORE this action (or group)
+            public int _selBeforeStart = -1;
+            public int _selBeforeEnd = -1;
+            public boolean _selBeforeMode = false;
+
+            // Selection snapshot AFTER this action
+            public int _selAfterStart = -1;
+            public int _selAfterEnd = -1;
+            public boolean _selAfterMode = false;
 
             public abstract void undo();
 
