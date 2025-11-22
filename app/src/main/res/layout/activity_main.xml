@@ -1,31 +1,218 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:orientation="vertical">
+<RelativeLayout
+	xmlns:android="http://schemas.android.com/apk/res/android"
+	android:id="@+id/rootLayout"
+	android:layout_width="match_parent"
+	android:layout_height="match_parent">
 
- 
+	<ProgressBar
+		android:id="@+id/indeterminateBar"
+		style="?android:attr/progressBarStyleHorizontal"
+		android:indeterminateOnly="true"
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:layout_alignParentTop="true"
+		android:layout_marginTop="-7dp"
+		android:layout_marginBottom="-7dp"
+		android:visibility="gone"/>
 
-    <ProgressBar
-        android:id="@+id/indeterminateBar"
-        style="?android:attr/progressBarStyleHorizontal"
-        android:indeterminateOnly="true" 
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="-7dp"
-        android:layout_marginBottom="-7dp"
-        android:layout_gravity="bottom"
-        android:visibility="gone"/>
+	<FrameLayout
+		android:id="@+id/editorContainer"
+		android:layout_width="match_parent"
+		android:layout_height="match_parent"
+		android:layout_below="@+id/indeterminateBar"
+		android:layout_above="@+id/frameLayout"/>
+	<FrameLayout
+		android:id="@+id/frameLayout"
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:layout_alignParentBottom="true">
 
-    <modder.hub.editor.EditView
-        android:id="@+id/editView"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-		android:layout_marginTop="0dp"
-        android:layout_marginStart="0dp"
-        android:paddingTop="0dp"
-        android:paddingStart="0dp" 
-        android:focusable="true"
-        android:focusableInTouchMode="true"/>
-</LinearLayout>
+		<LinearLayout
+			android:id="@+id/linear_bottom_layout"
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:background="#FFFFFF"
+			android:gravity="center_horizontal|center_vertical"
+			android:orientation="vertical">
+
+			<LinearLayout
+				android:id="@+id/linear_shortCut_pad"
+				android:layout_width="match_parent"
+				android:layout_height="37dp"
+				android:orientation="horizontal">
+
+				<HorizontalScrollView
+					android:scrollbars="none"
+					android:layout_width="match_parent"
+					android:layout_height="wrap_content">
+
+					<LinearLayout
+						android:id="@+id/functionBar"
+						android:orientation="horizontal"
+						android:layout_width="wrap_content"
+						android:layout_height="wrap_content"/>
+
+				</HorizontalScrollView>
+
+			</LinearLayout>
+
+			<LinearLayout
+				android:id="@+id/search_pad"
+				android:layout_width="match_parent"
+				android:layout_height="wrap_content"
+				android:background="#FAFAFA"
+				android:orientation="vertical"
+				android:visibility="gone">
+
+				<View
+					android:id="@+id/searchTopDivider"
+					android:layout_width="match_parent"
+					android:layout_height="0.5dp"
+					android:background="#BBBBBB"
+					android:orientation="horizontal"/>
+
+				<LinearLayout
+					android:layout_width="match_parent"
+					android:layout_height="wrap_content"
+					android:orientation="horizontal">
+
+					<TextView
+						android:layout_width="wrap_content"
+						android:layout_height="match_parent"
+						android:paddingLeft="8dp"
+						android:paddingTop="8dp"
+						android:paddingBottom="8dp"
+						android:gravity="center_horizontal|center_vertical"
+						android:text="Find"
+						style="@style/TextMaterialStyle"
+						android:textColor="#111111"/>
+
+					<EditText
+						android:id="@+id/edittext_find"
+						android:layout_width="match_parent"
+						android:layout_height="wrap_content"
+						android:textSize="14sp"
+						android:singleLine="true"/>
+
+				</LinearLayout>
+
+				<LinearLayout
+					android:id="@+id/linear_rep"
+					android:layout_width="match_parent"
+					android:layout_height="wrap_content"
+					android:orientation="horizontal"
+					android:visibility="gone">
+
+					<TextView
+						android:layout_width="wrap_content"
+						android:layout_height="match_parent"
+						android:paddingLeft="8dp"
+						android:paddingTop="8dp"
+						android:paddingBottom="8dp"
+						android:gravity="center_horizontal|center_vertical"
+						android:text="Rep "
+						style="@style/TextMaterialStyle"
+						android:textColor="#111111"/>
+
+					<EditText
+						android:id="@+id/edittext_replace"
+						android:layout_width="match_parent"
+						android:layout_height="wrap_content"
+						android:textSize="14sp"
+						android:singleLine="true"/>
+
+				</LinearLayout>
+
+				<View
+					android:id="@+id/searchBottomDivider"
+					android:layout_width="match_parent"
+					android:layout_height="0.63dp"
+					android:background="#BBBBBB"
+					android:orientation="horizontal"/>
+
+				<LinearLayout
+					android:layout_width="match_parent"
+					android:layout_height="wrap_content"
+					android:orientation="horizontal">
+
+					<TextView
+						android:id="@+id/previous_btn"
+						android:layout_width="0dp"
+						android:layout_height="wrap_content"
+						android:padding="8dp"
+						android:gravity="center_horizontal|center_vertical"
+						android:text="PREV"
+						android:textColor="#111111"
+						android:layout_weight="1"
+						android:background="?android:attr/selectableItemBackground"
+						style="@style/TextMaterialStyle"/>
+
+					<TextView
+						android:id="@+id/next_btn"
+						android:layout_width="0dp"
+						android:layout_height="wrap_content"
+						android:padding="8dp"
+						android:gravity="center_horizontal|center_vertical"
+						android:text="NEXT"
+						android:textColor="#111111"
+						android:layout_weight="1"
+						android:background="?android:attr/selectableItemBackground"
+						style="@style/TextMaterialStyle"/>
+
+					<TextView
+						android:id="@+id/replace_btn"
+						android:layout_width="0dp"
+						android:layout_height="wrap_content"
+						android:padding="8dp"
+						android:gravity="center_horizontal|center_vertical"
+						android:text="REP"
+						android:textColor="#111111"
+						android:layout_weight="1"
+						android:background="?android:attr/selectableItemBackground"
+						style="@style/TextMaterialStyle"/>
+
+					<TextView
+						android:id="@+id/replace_all_btn"
+						android:layout_width="0dp"
+						android:layout_height="wrap_content"
+						android:padding="8dp"
+						android:gravity="center_horizontal|center_vertical"
+						android:text="ALL"
+						android:textColor="#EAEAEA"
+						android:enabled="false"
+						android:clickable="false"
+						android:layout_weight="1"
+						android:background="?android:attr/selectableItemBackground"
+						style="@style/TextMaterialStyle"/>
+
+					<TextView
+						android:id="@+id/item_menu"
+						android:layout_width="wrap_content"
+						android:layout_height="wrap_content"
+						android:paddingLeft="20dp"
+						android:paddingTop="8dp"
+						android:paddingRight="20dp"
+						android:paddingBottom="8dp"
+						android:gravity="center_horizontal|center_vertical"
+						android:text="⋮"
+						android:textColor="#111111"
+						android:layout_gravity="center_horizontal|center_vertical"
+						android:background="?android:attr/selectableItemBackground"
+						style="@style/TextMaterialStyle"/>
+
+				</LinearLayout>
+
+			</LinearLayout>
+
+		</LinearLayout>
+
+		<View
+			android:background="#BBBBBB"
+			android:layout_width="match_parent"
+			android:layout_height="0.5dp"/>
+
+	</FrameLayout>
+
+</RelativeLayout>
+
