@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:icon="@drawable/ic_undo"
+        android:id="@+id/undo"
+        android:title="Undo"
+        android:showAsAction="always" />
+    <item
+        android:icon="@drawable/ic_redo"
+        android:id="@+id/redo"
+        android:title="Redo"
+        android:showAsAction="always" />
+    <item
+        android:icon="@drawable/ic_save"
+        android:id="@+id/save"
+        android:title="Save"
+        android:showAsAction="always" />
+    <item
+        android:showAsAction="always"
+        android:icon="@drawable/ic_edit"
+        android:id="@+id/edit_menu"
+        android:title="Edit">
+        <menu>
+            <item
+                android:id="@+id/copy_line"
+                android:icon="@drawable/ic_copy"
+                android:title="Copy line" />
+            <item
+                android:id="@+id/cut_line"
+                android:icon="@drawable/ic_cut"
+                android:title="Cut line" />
+            <item
+                android:id="@+id/delete_line"
+                android:icon="@drawable/ic_delete"
+                android:title="Delete line" />
+            <item
+                android:id="@+id/empty_line"
+                android:icon="@drawable/ic_empty"
+                android:title="Empty line" />
+            <item
+                android:id="@+id/replace_line"
+                android:icon="@drawable/ic_replace"
+                android:title="Replace line" />
+            <item
+                android:id="@+id/duplicate_line"
+                android:icon="@drawable/ic_duplicate"
+                android:title="Duplicate line" />
+            <item
+                android:id="@+id/convert_uppercase"
+                android:icon="@drawable/ic_uppercase"
+                android:title="Convert to uppercase" />
+            <item
+                android:id="@+id/convert_lowercase"
+                android:icon="@drawable/ic_lowercase"
+                android:title="Convert to lowercase" />
+            <item
+                android:id="@+id/increase_indent"
+                android:icon="@drawable/ic_right_arrow"
+                android:title="Increase Indent" />
+            <item
+                android:id="@+id/decrease_indent"
+                android:icon="@drawable/ic_left_arrow"
+                android:title="Decrease Indent" />
+            <item
+                android:id="@+id/toggle_comment"
+                android:icon="@drawable/ic_toggle_comment"
+                android:title="Toggle comment" />
+        </menu>
+    </item>
+    <item
+        android:showAsAction="always"
+		android:id="@+id/moreItems"
+        android:icon="@drawable/ic_more"
+        android:title="More">
+        <menu>
+			<item
+                android:id="@+id/openFile"
+                android:title="Open file" />
+			<item
+				android:id="@+id/search"
+				android:icon="@drawable/ic_search_dark"
+				android:title="Search" />
+			
+            <item
+                android:id="@+id/gotoLine"
+                android:icon="@drawable/ic_jump_line"
+                android:title="Jump to line" />
+            <group android:checkableBehavior="all">
+                <item
+                    android:id="@+id/read_only"
+                    android:icon="@drawable/ic_eye"
+                    android:checked="false"
+                    android:title="Read-only mode" />
+            </group>
+			<item
+                android:id="@+id/changeSyntax"
+                android:icon="@drawable/ic_syntax"
+                android:title="Syntax" />
+            <item
+                android:id="@+id/preference"
+                android:icon="@drawable/ic_setting"
+                android:title="Preference" />
+        </menu>
+    </item>
+</menu>
