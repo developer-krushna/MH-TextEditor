@@ -99,7 +99,11 @@ public class MHSyntaxHighlightEngine {
     // True if using dark mode (night colors)
     private final boolean darkMode;
 
+    // save comment block
     private final List<CommentDef> commentDefs = new ArrayList<>();
+
+    // preserve comment block
+    public String commentBlock;
 
     private static final Set<
             String> VALID_ESCAPES = new HashSet<>(Arrays.asList("n", "t", "r", "b", "f", "\\", "'", "\"", "u"));
@@ -275,15 +279,20 @@ public class MHSyntaxHighlightEngine {
     // Loading comment object from the langauage file
     private void loadCommentDefsFromLang(JSONObject lang) {
         commentDefs.clear();
+        commentBlock = null;
         try {
             if (!lang.has("comment")) return;
-
             Object c = lang.get("comment");
             if (c instanceof JSONObject) {
                 JSONObject o = (JSONObject) c;
                 String s = o.optString("startsWith", null);
                 String e = o.optString("endsWith", null);
-                if (s != null && !s.isEmpty()) commentDefs.add(new CommentDef(s, e));
+                if (s != null && !s.isEmpty() && (e == null || e.isEmpty())) {
+                    commentBlock = s;
+                }
+                if (s != null && !s.isEmpty()) {
+                    commentDefs.add(new CommentDef(s, e));
+                }
             } else if (c instanceof JSONArray) {
                 JSONArray arr = (JSONArray) c;
                 for (int i = 0; i < arr.length(); i++) {
@@ -291,13 +300,23 @@ public class MHSyntaxHighlightEngine {
                     if (o == null) continue;
                     String s = o.optString("startsWith", null);
                     String e = o.optString("endsWith", null);
-                    if (s != null && !s.isEmpty()) commentDefs.add(new CommentDef(s, e));
+                    if (s != null && !s.isEmpty() && (e == null || e.isEmpty())) {
+                        commentBlock = s;
+                    }
+                    if (s != null && !s.isEmpty()) {
+                        commentDefs.add(new CommentDef(s, e));
+                    }
                 }
             }
         } catch (Exception ex) {
-            // never crash loading comments; ignore malformed comment spec
+            // load fail instead of crash
             Log.w(TAG, "Failed to load comment defs", ex);
         }
+    }
+
+    // Helper method, usefull for EditView for extracting comment block
+    public String getCommentSyntaxBlock() {
+        return commentBlock;
     }
 
     /** Reads a file from the assets directory as UTF-8 text. */
