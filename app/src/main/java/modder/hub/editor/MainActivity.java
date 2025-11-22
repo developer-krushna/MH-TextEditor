@@ -6,7 +6,9 @@ import android.app.AlertDialog;
 import android.content.DialogInterface;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.graphics.Color;
 import android.graphics.Typeface;
+import android.graphics.drawable.Drawable;
 import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
@@ -14,11 +16,19 @@ import android.os.Environment;
 import android.os.Handler;
 import android.os.Message;
 import android.preference.PreferenceManager;
+import android.text.Editable;
+import android.text.TextWatcher;
+import android.util.TypedValue;
+import android.view.Gravity;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.EditText;
+import android.widget.FrameLayout;
+import android.widget.LinearLayout;
+import android.widget.PopupMenu;
 import android.widget.ProgressBar;
+import android.widget.TextView;
 import android.widget.Toast;
 import java.io.BufferedWriter;
 import java.io.File;
@@ -30,24 +40,42 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
+import java.util.Arrays;
+import java.util.List;
 import modder.hub.editor.EditView;
+import modder.hub.editor.R;
 import modder.hub.editor.buffer.GapBuffer;
 import modder.hub.editor.listener.OnTextChangedListener;
 import org.mozilla.universalchardet.UniversalDetector;
-
+import modder.hub.editor.component.ClipboardPanel;
 
 public class MainActivity extends Activity {
 
-    private EditView mEditView;
+    private final String TAG = this.getClass().getSimpleName();
+
+    private EditView editView;
 
     private ProgressBar mIndeterminateBar;
 
     private SharedPreferences mSharedPreference;
-    private SharedPreferences theme_prefs;
+    private SharedPreferences editor_pref;
+
     private Charset mDefaultCharset = StandardCharsets.UTF_8;
     private String externalPath = File.separator;
 
-    private final String TAG = this.getClass().getSimpleName();
+    private EditText edittext_replace, edittext_find;
+    private TextView previous_btn, next_btn, replace_btn, replace_all_btn, item_menu;
+    private LinearLayout search_pad, linear_rep;
+
+    private FrameLayout editorContainer;
+    private LinearLayout functionBar;
+
+    private static final List<String> SYMBOLS = Arrays.asList(
+            "(", ")", "[", "]", "{", "}", ".", ",", ";",
+            "'", "\"", "+", "-", "*", "/", "%", "=", "<",
+            ">", "&", "|", "~", "^", "!", "?", "\\", ":",
+            "#", "@", "`"
+    );
 
     private Handler mHandler = new Handler() {
         @Override
@@ -58,66 +86,79 @@ public class MainActivity extends Activity {
         }
     };
 
-    public static String readFile(String path) {
-
-        StringBuilder sb = new StringBuilder();
-        FileReader fr = null;
-        try {
-            fr = new FileReader(new File(path));
-
-            char[] buff = new char[1024];
-            int length = 0;
-
-            while ((length = fr.read(buff)) > 0) {
-                sb.append(new String(buff, 0, length));
-            }
-        } catch (IOException e) {
-            e.printStackTrace();
-        } finally {
-            if (fr != null) {
-                try {
-                    fr.close();
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-            }
-        }
-
-        return sb.toString();
-    }
-
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        initialize();
+        initializeLogic();
+    }
 
+    private void initialize() {
         mIndeterminateBar = findViewById(R.id.indeterminateBar);
         mIndeterminateBar.setBackground(null);
-
-        theme_prefs = getSharedPreferences("theme_prefs", Activity.MODE_PRIVATE);
+        editor_pref = getSharedPreferences("editor_pref", Activity.MODE_PRIVATE);
         mSharedPreference = PreferenceManager.getDefaultSharedPreferences(this);
 
-        mEditView = findViewById(R.id.editView);
-        mEditView.setTypeface(Typeface.DEFAULT);
-        if (theme_prefs.contains("selected_position")) {
-            if (theme_prefs.getInt("selected_position", 0) == 1) {
-                mEditView.setSyntaxLanguageFileName("smali.json");
+        edittext_replace = findViewById(R.id.edittext_replace);
+        edittext_find = findViewById(R.id.edittext_find);
+        previous_btn = findViewById(R.id.previous_btn);
+        next_btn = findViewById(R.id.next_btn);
+        replace_btn = findViewById(R.id.replace_btn);
+        replace_all_btn = findViewById(R.id.replace_all_btn);
+        item_menu = findViewById(R.id.item_menu);
+        search_pad = findViewById(R.id.search_pad);
+        linear_rep = findViewById(R.id.linear_rep);
+
+        editorContainer = findViewById(R.id.editorContainer);
+        functionBar = findViewById(R.id.functionBar);
+
+        editView = new EditView(this);
+    }
+
+    private void initializeLogic() {
+        setTitle("MH Text Editor");
+        editView.setLayoutParams(new FrameLayout.LayoutParams(
+        FrameLayout.LayoutParams.MATCH_PARENT,
+        FrameLayout.LayoutParams.MATCH_PARENT
+        ));
+
+        editorContainer.addView(editView);
+        editorContainer.setFocusableInTouchMode(true);
+        editView.requestFocus();
+
+        addFunctionBar(functionBar, editView);
+
+        editView.setTypeface(Typeface.DEFAULT);
+        if (editor_pref.contains("syntax_position")) {
+            if (editor_pref.getInt("syntax_position", 0) == 1) {
+                editView.setSyntaxLanguageFileName("smali.json");
             }
-            if (theme_prefs.getInt("selected_position", 0) == 2) {
-                mEditView.setSyntaxLanguageFileName("xml.json");
+            if (editor_pref.getInt("syntax_position", 0) == 2) {
+                editView.setSyntaxLanguageFileName("xml.json");
             }
-            if (theme_prefs.getInt("selected_position", 0) == 3) {
-                mEditView.setSyntaxLanguageFileName("java.json");
+            if (editor_pref.getInt("syntax_position", 0) == 3) {
+                editView.setSyntaxLanguageFileName("java.json");
             }
         }
-        mEditView.setSyntaxDarkMode(false);
-        // mTextView.setWordWrapEnabled(true);
+        if (editor_pref.contains("menu_style")) {
+            if (editor_pref.getInt("menu_style", 0) == 0) {
+                editView.setMenuStyle(ClipboardPanel.MenuDisplayMode.ICON_AND_TEXT);
+            }
+            if (editor_pref.getInt("menu_style", 0) == 1) {
+                editView.setMenuStyle(ClipboardPanel.MenuDisplayMode.TEXT_ONLY);
+            }
+            if (editor_pref.getInt("menu_style", 0) == 2) {
+                editView.setMenuStyle(ClipboardPanel.MenuDisplayMode.ICON_ONLY);
+            }
+        }
 
-        mEditView.setOnTextChangedListener(new OnTextChangedListener() {
+        editView.setSyntaxDarkMode(false);
+        editView.setOnTextChangedListener(new OnTextChangedListener() {
             @Override
             public void onTextChanged() {
                 mHandler.sendEmptyMessage(0);
-                mEditView.postInvalidate();
+                editView.postInvalidate();
             }
         });
         if (mSharedPreference.contains("path")) {
@@ -155,7 +196,7 @@ public class MainActivity extends Activity {
     }
 
     private void toggleEditMode() {
-        mEditView.setEditedMode(!mEditView.getEditedMode());
+        editView.setEditedMode(!editView.getEditedMode());
         mHandler.sendEmptyMessage(0);
     }
 
@@ -167,67 +208,123 @@ public class MainActivity extends Activity {
 
     @Override
     public boolean onPrepareOptionsMenu(Menu menu) {
-        // TODO: Implement this method
-        MenuItem undo = menu.findItem(R.id.menu_undo);
-        undo.setIcon(R.drawable.ic_undo_white_24dp);
-        if (mEditView.canUndo())
+        MenuItem moreMenu = menu.findItem(R.id.moreItems);
+        moreMenu.getIcon().setTint(Color.WHITE);
+        MenuItem saveMenu = menu.findItem(R.id.save);
+        MenuItem undo = menu.findItem(R.id.undo);
+        undo.setIcon(R.drawable.ic_undo);
+        if (editView.canUndo()) {
+            undo.getIcon().setTint(Color.WHITE);
             undo.setEnabled(true);
-        else
+            saveMenu.getIcon().setTint(Color.WHITE);
+        } else {
+            saveMenu.getIcon().setTint(Color.GRAY);
+            undo.getIcon().setTint(Color.GRAY);
             undo.setEnabled(false);
-
-        MenuItem redo = menu.findItem(R.id.menu_redo);
-        redo.setIcon(R.drawable.ic_redo_white_24dp);
-        if (mEditView.canRedo())
+        }
+        MenuItem redo = menu.findItem(R.id.redo);
+        redo.setIcon(R.drawable.ic_redo);
+        if (editView.canRedo()) {
+            redo.getIcon().setTint(Color.WHITE);
             redo.setEnabled(true);
-        else
+        } else {
+            redo.getIcon().setTint(Color.GRAY);
             redo.setEnabled(false);
+        }
+        MenuItem editMode = menu.findItem(R.id.read_only);
 
-        MenuItem editMode = menu.findItem(R.id.menu_edit);
-
-        if (mEditView.getEditedMode())
-            editMode.setIcon(R.drawable.ic_edit_white_24dp);
-        else
-            editMode.setIcon(R.drawable.ic_look_white_24dp);
-
+        if (editView.getEditedMode()) {
+            editMode.setChecked(false);
+        } else {
+            editMode.setChecked(true);
+        }
         return super.onPrepareOptionsMenu(menu);
     }
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
-        getMenuInflater().inflate(R.menu.main, menu);
+        getMenuInflater().inflate(R.menu.editor_menu, menu);
         return super.onCreateOptionsMenu(menu);
     }
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         switch (item.getItemId()) {
-            case R.id.menu_undo:
-                mEditView.undo();
+            case R.id.undo:
+                editView.undo();
                 break;
-            case R.id.menu_redo:
-                mEditView.redo();
+            case R.id.search:
+                searchPanel();
                 break;
-            case R.id.menu_edit:
+            case R.id.redo:
+                editView.redo();
+                break;
+            case R.id.read_only:
+                search_pad.setVisibility(View.GONE);
                 toggleEditMode();
                 break;
-            case R.id.menu_open:
+            case R.id.openFile:
                 showOpenFileDialog();
                 break;
-            case R.id.menu_gotoline:
+            case R.id.gotoLine:
                 showGotoLineDialog();
                 break;
-            case R.id.menu_syntax:
-                _themeSelection();
+            case R.id.changeSyntax:
+                _syntaxSelection();
                 break;
-            case R.id.menu_save:
-                String path = mSharedPreference.getString("path", "");
-                new WriteFileThread().execute(path);
+            case R.id.preference:
+                menuStyle();
                 break;
+            case R.id.save:
+                break;
+            case R.id.delete_line:
+                editView.deleteLine();
+                return true;
+
+            case R.id.empty_line:
+                editView.emptyLine();
+                return true;
+
+            case R.id.replace_line:
+                editView.replaceLine();
+                return true;
+
+            case R.id.duplicate_line:
+                editView.duplicateLine();
+                return true;
+
+            case R.id.toggle_comment:
+                editView.toggleComment();
+                return true;
+
+            case R.id.copy_line:
+                editView.copyLine();
+                return true;
+
+            case R.id.cut_line:
+                editView.cutLine();
+                return true;
+
+            case R.id.convert_uppercase:
+                editView.convertSelectionToUpperCase();
+                return true;
+
+            case R.id.convert_lowercase:
+                editView.convertSelectionToLowerCase();
+                return true;
+
+            case R.id.increase_indent:
+                editView.increaseIndent();
+                return true;
+
+            case R.id.decrease_indent:
+                editView.decreaseIndent();
+                return true;
         }
         return super.onOptionsItemSelected(item);
     }
 
-    public void _themeSelection() {
+    public void _syntaxSelection() {
         final AlertDialog.Builder d_build = new AlertDialog.Builder(MainActivity.this);
         d_build.setTitle("Syntax");
         String[] items = {"Text", "Smali", "Xml", "Java"};
@@ -235,19 +332,46 @@ public class MainActivity extends Activity {
         d_build.setSingleChoiceItems(items, checkedItem, new DialogInterface.OnClickListener() {
             @Override
             public void onClick(DialogInterface dialog, int which) {
-                _savePosition((double) which);
+                _savePosition((double) which, "syntax_position");
                 switch (which) {
                     case 0:
-                        mEditView.setSyntaxLanguageFileName(null);
+                        editView.setSyntaxLanguageFileName(null);
                         break;
                     case 1:
-                        mEditView.setSyntaxLanguageFileName("smali.json");
+                        editView.setSyntaxLanguageFileName("smali.json");
                         break;
                     case 2:
-                        mEditView.setSyntaxLanguageFileName("xml.json");
+                        editView.setSyntaxLanguageFileName("xml.json");
                         break;
                     case 3:
-                        mEditView.setSyntaxLanguageFileName("java.json");
+                        editView.setSyntaxLanguageFileName("java.json");
+                        break;
+                }
+                dialog.dismiss();
+            }
+        });
+        d_build.setPositiveButton("Close", null);
+        d_build.show();
+    }
+
+    public void menuStyle() {
+        final AlertDialog.Builder d_build = new AlertDialog.Builder(MainActivity.this);
+        d_build.setTitle("Floating Menu Style");
+        String[] items = {"Show all", "Show title only", "Show icon only"};
+        int checkedItem = (int) _getMenuStyle();
+        d_build.setSingleChoiceItems(items, checkedItem, new DialogInterface.OnClickListener() {
+            @Override
+            public void onClick(DialogInterface dialog, int which) {
+                _savePosition((double) which, "menu_style");
+                switch (which) {
+                    case 0:
+                        editView.setMenuStyle(ClipboardPanel.MenuDisplayMode.ICON_AND_TEXT);
+                        break;
+                    case 1:
+                        editView.setMenuStyle(ClipboardPanel.MenuDisplayMode.TEXT_ONLY);
+                        break;
+                    case 2:
+                        editView.setMenuStyle(ClipboardPanel.MenuDisplayMode.ICON_ONLY);
                         break;
                 }
                 dialog.dismiss();
@@ -258,23 +382,31 @@ public class MainActivity extends Activity {
     }
 
     public double _getThemePosition() {
-        if (theme_prefs.contains("selected_position")) {
-            return ((double) theme_prefs.getInt("selected_position", 0));
+        if (editor_pref.contains("syntax_position")) {
+            return ((double) editor_pref.getInt("syntax_position", 0));
         } else {
             return (0);
         }
     }
 
-    public void _savePosition(final double _position) {
-        SharedPreferences.Editor editor = theme_prefs.edit();
-        editor.putInt("selected_position", (int) _position);
+    public double _getMenuStyle() {
+        if (editor_pref.contains("menu_style")) {
+            return ((double) editor_pref.getInt("menu_style", 0));
+        } else {
+            return (2);
+        }
+    }
+
+    public void _savePosition(final double _position, String name) {
+        SharedPreferences.Editor editor = editor_pref.edit();
+        editor.putInt(name, (int) _position);
         editor.apply();
     }
 
     private void showGotoLineDialog() {
         final View v = getLayoutInflater().inflate(R.layout.dialog_gotoline, null);
         final EditText lineEdit = v.findViewById(R.id.lineEdit);
-        lineEdit.setHint("1.." + mEditView.getLineCount());
+        lineEdit.setHint("1.." + editView.getLineCount());
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setView(v);
         builder.setTitle("goto line");
@@ -285,7 +417,7 @@ public class MainActivity extends Activity {
             public void onClick(DialogInterface dia, int which) {
                 String line = lineEdit.getText().toString();
                 if (!line.isEmpty()) {
-                    mEditView.gotoLine(Integer.parseInt(line));
+                    editView.gotoLine(Integer.parseInt(line));
                 }
             }
         });
@@ -326,7 +458,7 @@ public class MainActivity extends Activity {
         protected void onPreExecute() {
             // TODO: Implement this method
             super.onPreExecute();
-            mEditView.setEditedMode(false);
+            editView.setEditedMode(false);
             mHandler.sendEmptyMessage(0);
             mIndeterminateBar.setVisibility(View.VISIBLE);
         }
@@ -346,8 +478,8 @@ public class MainActivity extends Activity {
 
                 // Replace buffer wholesale (like setText, but async)
                 GapBuffer newBuffer = new GapBuffer(fullText);
-                mEditView.setBuffer(newBuffer); // Assumes mTextView is your EditView; adjust if
-                                                // needed
+                editView.setBuffer(newBuffer); // Assumes mTextView is your EditView; adjust if
+                // needed
 
             } catch (Exception e) {
                 e.printStackTrace();
@@ -361,7 +493,7 @@ public class MainActivity extends Activity {
         protected void onPostExecute(Boolean result) {
             // TODO: Implement this method
             super.onPostExecute(result);
-            mEditView.setEditedMode(true);
+            editView.setEditedMode(true);
             mHandler.sendEmptyMessage(0);
             mIndeterminateBar.setVisibility(View.GONE);
         }
@@ -379,7 +511,7 @@ public class MainActivity extends Activity {
                 BufferedWriter bufferWrite = null;
                 bufferWrite = Files.newBufferedWriter(path, mDefaultCharset,
                         StandardOpenOption.WRITE);
-                bufferWrite.write(mEditView.getBuffer().toString());
+                bufferWrite.write(editView.getBuffer().toString());
                 bufferWrite.flush();
                 bufferWrite.close();
             } catch (Exception e) {
@@ -395,4 +527,169 @@ public class MainActivity extends Activity {
             Toast.makeText(getApplicationContext(), "saved success!", Toast.LENGTH_SHORT).show();
         }
     }
+
+    private void searchPanel() {
+        edittext_find.requestFocus();
+
+        search_pad.setVisibility(View.VISIBLE);
+        if (!editView.getEditedMode()) {
+            replace_btn.setEnabled(false);
+            replace_btn.setTextColor(Color.parseColor("#EAEAEA"));
+        } else {
+            replace_btn.setTextColor(Color.parseColor("#111111"));
+            replace_btn.setEnabled(true);
+        }
+        replace_btn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                replace_all_btn.setTextColor(Color.parseColor("#111111"));
+                replace_all_btn.setEnabled(true);
+                if (linear_rep.getVisibility() == View.VISIBLE)
+                    editView.replaceFirst(edittext_replace.getText().toString());
+                else
+                    linear_rep.setVisibility(View.VISIBLE);
+            }
+        });
+        replace_all_btn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                editView.replaceAll(edittext_replace.getText().toString());
+            }
+        });
+        next_btn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                editView.next();
+            }
+        });
+        previous_btn.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                editView.previous();
+            }
+        });
+        edittext_find.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                try {
+                    // Only regex implented here
+                    editView.find(s.toString());
+                } catch (Exception e) {
+                }
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {}
+        });
+
+        item_menu.setOnClickListener(new View.OnClickListener() {
+
+            @Override
+            public void onClick(View view) {
+                PopupMenu popup = new PopupMenu(MainActivity.this, item_menu);
+                popup.inflate(R.menu.menu_search_options);
+                popup.getMenu().findItem(R.id.search_option_regex).setChecked(true);
+                popup.setOnMenuItemClickListener(new PopupMenu.OnMenuItemClickListener() {
+                    public boolean onMenuItemClick(MenuItem item) {
+                        int id = item.getItemId();
+                        switch (id) {
+                            case R.id.search_option_regex:
+                                // to do
+                                break;
+                            case R.id.search_option_whole_word:
+                                // to do
+                                break;
+                            case R.id.search_option_match_case:
+                                // to do
+                                break;
+                            case R.id.close_search_options:
+                                search_pad.setVisibility(View.GONE);
+                                break;
+                        }
+                        return true;
+                    }
+                });
+                popup.show();
+            }
+        });
+    }
+
+    public void addFunctionBar(LinearLayout container, final EditView editView) {
+        Toast.makeText(getApplication(), "A basic implantation has done here.. Currently i am studing about it to fix the known issues", Toast.LENGTH_SHORT).show();
+        container.setOrientation(LinearLayout.HORIZONTAL);
+        container.removeAllViews();
+
+        for (String symbol : SYMBOLS) {
+
+            final TextView tv = new TextView(container.getContext());
+            tv.setText(symbol);
+            tv.setTag(symbol);
+            tv.setBackground(getSelectableBackground());
+            tv.setTextSize(18f);
+            tv.setTextColor(Color.parseColor("#111111"));
+            tv.setPadding(30, 20, 30, 20);
+            tv.setGravity(Gravity.CENTER);
+
+            tv.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View view) {
+                    if (edittext_find.hasFocus()) {
+                        String str = new String(edittext_find.getText().toString());
+                        edittext_find.setText(str.concat(tv.getText().toString()));
+                    } else {
+                        editView.insertText(tv.getText().toString());
+                    }
+                }
+            });
+
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            LinearLayout.LayoutParams.MATCH_PARENT
+            );
+
+            container.addView(tv, lp);
+        }
+    }
+
+    private Drawable getSelectableBackground() {
+        TypedValue outValue = new TypedValue();
+        getTheme().resolveAttribute(android.R.attr.selectableItemBackground, outValue, true);
+
+        if (Build.VERSION.SDK_INT >= 21) {
+            return getResources().getDrawable(outValue.resourceId, getTheme());
+        } else {
+            return getResources().getDrawable(outValue.resourceId);
+        }
+    }
+
+    public static String readFile(String path) {
+        StringBuilder sb = new StringBuilder();
+        FileReader fr = null;
+        try {
+            fr = new FileReader(new File(path));
+
+            char[] buff = new char[1024];
+            int length = 0;
+
+            while ((length = fr.read(buff)) > 0) {
+                sb.append(new String(buff, 0, length));
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        } finally {
+            if (fr != null) {
+                try {
+                    fr.close();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+
+        return sb.toString();
+    }
+
 }
