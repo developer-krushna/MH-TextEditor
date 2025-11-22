@@ -37,6 +37,7 @@ package modder.hub.editor.component;
 
 import android.content.ClipboardManager;
 import android.content.Context;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.res.ColorStateList;
 import android.content.res.TypedArray;
@@ -73,6 +74,7 @@ import modder.hub.editor.EditView;
 import modder.hub.editor.R;
 import modder.hub.editor.treeObserver.OnComputeInternalInsetsListener;
 import modder.hub.editor.treeObserver.ViewTreeObserverReflection;
+import modder.hub.editor.utils.LinkChecker;
 import modder.hub.editor.utils.menuUtils.MenuAction;
 import modder.hub.editor.utils.menuUtils.MenuItemConfig;
 import modder.hub.editor.utils.menuUtils.MenuItemData;
@@ -195,6 +197,8 @@ public class ClipboardPanel {
         _allMenuItems.put("panel_btn_select_all", new MenuItemConfig("Select All", R.drawable.ic_select_all, MenuAction.SELECT_ALL));
         _allMenuItems.put("share_btn", new MenuItemConfig("Share", R.drawable.ic_share, MenuAction.SHARE));
         _allMenuItems.put("goto_btn", new MenuItemConfig("Go to", R.drawable.ic_goto, MenuAction.GOTO));
+        _allMenuItems.put("comment_btn", new MenuItemConfig("Toggle comment", R.drawable.ic_toggle_comment, MenuAction.TOGGLE_COMMENT));
+        _allMenuItems.put("openLink_btn", new MenuItemConfig("Open link", R.drawable.ic_open_link, MenuAction.OPEN_LINK));
         _allMenuItems.put("panel_btn_translate", new MenuItemConfig("Translate", R.drawable.ic_translate, MenuAction.TRANSLATE));
         _allMenuItems.put("delete_btn", new MenuItemConfig("Delete", R.drawable.ic_delete, MenuAction.DELETE));
     }
@@ -214,6 +218,8 @@ public class ClipboardPanel {
                     "{\"id\":\"goto_btn\",\"title\":\"Go To\",\"disabled\":true}," +
                     "{\"id\":\"panel_btn_cut\",\"title\":\"Cut\",\"disabled\":false}," +
                     "{\"id\":\"share_btn\",\"title\":\"Share\",\"disabled\":false}," +
+                    "{\"id\":\"comment_btn\",\"title\":\"Toggle comment\",\"disabled\":false}," +
+                    "{\"id\":\"openLink_btn\",\"title\":\"Open link\",\"disabled\":false}," +
                     "{\"id\":\"panel_btn_translate\",\"title\":\"Translate\",\"disabled\":false}," +
                     "{\"id\":\"delete_btn\",\"title\":\"Delete\",\"disabled\":false}" +
                     "]";
@@ -258,6 +264,8 @@ public class ClipboardPanel {
         _menuItems.add("goto_btn");
         _menuItems.add("panel_btn_cut");
         _menuItems.add("share_btn");
+        _menuItems.add("comment_btn");
+        _menuItems.add("openLink_btn");
         _menuItems.add("panel_btn_translate");
         _menuItems.add("delete_btn");
     }
@@ -405,6 +413,26 @@ public class ClipboardPanel {
                         continue;
                     }
                 }
+
+                if (config.action == MenuAction.TOGGLE_COMMENT) {
+                    if (!_editView.getEditedMode()) {
+                        continue;
+                    }
+                }
+
+                if (config.action == MenuAction.OPEN_LINK) {
+                    if (!isTextSelected()) {
+                        continue;
+                    }
+                    int selLen = _editView.getSelectionLength();
+                    if (selLen < 500 && selLen > 0) {
+                        String text = _editView.getSelectedText(); // small → safe
+                        if (!LinkChecker.isLink(text)) continue;
+                    } else {
+                        continue;
+                    }
+                }
+
                 if (config.action == MenuAction.COPY && !isTextSelected()) {
                     continue;
                 }
@@ -550,7 +578,7 @@ public class ClipboardPanel {
         // For icon-only mode, we can be more aggressive
         if (_menuDisplayMode == MenuDisplayMode.ICON_ONLY) {
             maxItems = Math.min(5, maxItemsWithOverflow + 1); // Allow one more since icons are
-                                                              // compact
+            // compact
         }
 
         // For text-only mode, follow Android system behavior (usually 4 items)
@@ -571,6 +599,7 @@ public class ClipboardPanel {
 
         ImageView expandIcon = expandButtonView.findViewById(R.id.expandIcon);
         expandIcon.setImageResource(R.drawable.ic_more);
+        expandIcon.getDrawable().setTint(Color.BLACK);
 
         // Set proper icon size - this is the key fix
         ViewGroup.LayoutParams iconParams = expandIcon.getLayoutParams();
@@ -643,7 +672,7 @@ public class ClipboardPanel {
         // KEY FIX: Align icon to left instead of center
         if (_upButton instanceof LinearLayout) {
             ((LinearLayout) _upButton).setGravity(Gravity.CENTER_VERTICAL | Gravity.START); // Left
-                                                                                            // alignment
+            // alignment
         }
 
         // Add left padding to position the icon properly
@@ -1303,12 +1332,31 @@ public class ClipboardPanel {
             case SELECT_ALL:
                 _editView.selectAll();
                 break;
+            case OPEN_LINK:
+                String selectedText = _editView.getSelectedText();
+                if (selectedText != null) {
+                    LinkChecker.openLinkInBrowser(_editView.getContext(), selectedText);
+                }
+                break;
             case SHARE:
+                String selectedText2 = _editView.getSelectedText();
+                if (selectedText2 != null) {
+                    try {
+                        Intent shareIntent = new Intent(Intent.ACTION_SEND);
+                        shareIntent.setType("text/plain");
+                        shareIntent.putExtra(Intent.EXTRA_TEXT, selectedText2);
+                        _editView.getContext().startActivity(Intent.createChooser(shareIntent, "Share Text"));
+                    } catch (Exception e) {
+                    }
+                }
                 break;
             case GOTO:
                 break;
             case DELETE:
                 _editView.delete();
+                break;
+            case TOGGLE_COMMENT:
+                _editView.toggleComment();
                 break;
         }
         hide();
