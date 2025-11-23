@@ -34,20 +34,24 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import modder.hub.editor.EditView;
 import modder.hub.editor.R;
 import modder.hub.editor.buffer.GapBuffer;
-import modder.hub.editor.listener.OnTextChangedListener;
-import org.mozilla.universalchardet.UniversalDetector;
 import modder.hub.editor.component.ClipboardPanel;
+import modder.hub.editor.listener.OnTextChangedListener;
+import org.json.JSONArray;
+import org.json.JSONObject;
+import org.mozilla.universalchardet.UniversalDetector;
 
 public class MainActivity extends Activity {
 
@@ -131,16 +135,16 @@ public class MainActivity extends Activity {
 
         editView.setTypeface(Typeface.DEFAULT);
         if (editor_pref.contains("syntax_position")) {
-            if (editor_pref.getInt("syntax_position", 0) == 1) {
-                editView.setSyntaxLanguageFileName("smali.json");
-            }
-            if (editor_pref.getInt("syntax_position", 0) == 2) {
-                editView.setSyntaxLanguageFileName("xml.json");
-            }
-            if (editor_pref.getInt("syntax_position", 0) == 3) {
-                editView.setSyntaxLanguageFileName("java.json");
-            }
-        }
+			int pos = editor_pref.getInt("syntax_position", 0);
+			if (pos == 0) {
+				editView.setSyntaxLanguageFileName(null);
+			} else {
+				List<SyntaxItem> syntaxList = loadSyntaxList();
+				if (pos - 1 < syntaxList.size()) {
+					editView.setSyntaxLanguageFileName(syntaxList.get(pos - 1).Path);
+				}
+			}
+		}
         if (editor_pref.contains("menu_style")) {
             if (editor_pref.getInt("menu_style", 0) == 0) {
                 editView.setMenuStyle(ClipboardPanel.MenuDisplayMode.ICON_AND_TEXT);
@@ -325,34 +329,40 @@ public class MainActivity extends Activity {
     }
 
     public void _syntaxSelection() {
-        final AlertDialog.Builder d_build = new AlertDialog.Builder(MainActivity.this);
-        d_build.setTitle("Syntax");
-        String[] items = {"Text", "Smali", "Xml", "Java"};
-        int checkedItem = (int) _getThemePosition();
-        d_build.setSingleChoiceItems(items, checkedItem, new DialogInterface.OnClickListener() {
-            @Override
-            public void onClick(DialogInterface dialog, int which) {
-                _savePosition((double) which, "syntax_position");
-                switch (which) {
-                    case 0:
-                        editView.setSyntaxLanguageFileName(null);
-                        break;
-                    case 1:
-                        editView.setSyntaxLanguageFileName("smali.json");
-                        break;
-                    case 2:
-                        editView.setSyntaxLanguageFileName("xml.json");
-                        break;
-                    case 3:
-                        editView.setSyntaxLanguageFileName("java.json");
-                        break;
-                }
-                dialog.dismiss();
-            }
-        });
-        d_build.setPositiveButton("Close", null);
-        d_build.show();
-    }
+		final List<SyntaxItem> syntaxList = loadSyntaxList();
+		
+		List<String> display = new ArrayList<>();
+		display.add("Text");
+		
+		for (SyntaxItem item : syntaxList) {
+			display.add(item.Syntax);
+		}
+		
+		String[] items = display.toArray(new String[0]);
+		int checkedItem = editor_pref.getInt("syntax_position", 0);
+		
+		AlertDialog.Builder d = new AlertDialog.Builder(this);
+		d.setTitle("Syntax");
+		
+		d.setSingleChoiceItems(items, checkedItem, new DialogInterface.OnClickListener() {
+				@Override
+				public void onClick(DialogInterface dialog, int which) {
+					_savePosition(which, "syntax_position");
+					if (which == 0) {
+						// Text mode (no syntax)
+						editView.setSyntaxLanguageFileName(null);
+					} else {
+						// which - 1 because the first item is "Text"
+						SyntaxItem selected = syntaxList.get(which - 1);
+						editView.setSyntaxLanguageFileName(selected.Path);
+					}
+					dialog.dismiss();
+				}
+			});
+
+		d.setPositiveButton("Close", null);
+		d.show();
+	}
 
     public void menuStyle() {
         final AlertDialog.Builder d_build = new AlertDialog.Builder(MainActivity.this);
@@ -664,6 +674,39 @@ public class MainActivity extends Activity {
             return getResources().getDrawable(outValue.resourceId);
         }
     }
+	
+	private List<SyntaxItem> loadSyntaxList() {
+		try {
+			InputStream is = getAssets().open("availableSyntax.json");
+			int size = is.available();
+			byte[] buffer = new byte[size];
+			is.read(buffer);
+			is.close();
+			String json = new String(buffer, "UTF-8");
+
+			JSONArray arr = new JSONArray(json);
+			List<SyntaxItem> list = new ArrayList<>();
+
+			for (int i = 0; i < arr.length(); i++) {
+				JSONObject o = arr.getJSONObject(i);
+				SyntaxItem item = new SyntaxItem();
+				item.Syntax = o.getString("Syntax");
+				item.Path = o.getString("Path");
+				list.add(item);
+			}
+			return list;
+
+		} catch (Exception e) {
+			e.printStackTrace();
+			return new ArrayList<>();
+		}
+	}
+	
+	public class SyntaxItem {
+		public String Syntax;
+		public String Path;
+	}
+	
 
     public static String readFile(String path) {
         StringBuilder sb = new StringBuilder();
