@@ -1,0 +1,33 @@
+{
+  "name": ["JSON", ".json"],
+  "comment": [
+    { "startsWith": "//" },
+    { "startsWith": "/*", "endsWith": "*/" }
+  ],
+  
+  "rules": [
+    // Single-line comments
+    { "type": "comment", "regex": "//.*" },
+    
+    // Multi-line comments
+    { "type": "comment", "regex": "/\\*[\\s\\S]*?\\*/" },
+    
+    // Double quoted strings
+    { "type": "string", "regex": "\"(?:\\\\.|[^\"])*\"" },
+    
+    // Numbers
+    { "type": "number", "regex": "-?\\b\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?\\b" },
+    
+    // JSON literals
+    {
+      "type": "keyword",
+      "regex": "\\b(?:true|false|null)\\b"
+    },
+    
+    // Punctuation
+    { "type": "operator", "regex": "[{},:\\[\\]]" },
+    
+    // Default fallback
+    { "type": "default", "regex": "." }
+  ]
+}

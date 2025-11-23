@@ -1,0 +1,108 @@
+{
+  "name": ["Dart", ".dart"],
+  "comment": [
+    { "startsWith": "//" },
+    { "startsWith": "/*", "endsWith": "*/" }
+  ],
+  
+  "rules": [
+    // Single-line comments
+    { "type": "comment", "regex": "//.*" },
+    
+    // Multi-line comments
+    { "type": "comment", "regex": "/\\*[\\s\\S]*?\\*/" },
+    
+    // Triple double quoted strings with interpolation
+    {
+      "regex": "\"\"\"[\\s\\S]*?\"\"\"",
+      "groupStyles": { "0": "string" }
+    },
+    
+    // Triple single quoted strings with interpolation
+    {
+      "regex": "'''[\\s\\S]*?'''",
+      "groupStyles": { "0": "string" }
+    },
+    
+    // Double quoted strings with interpolation
+    {
+      "regex": "\"(?:\\\\.|[^\"])*\"",
+      "groupStyles": { "0": "string" }
+    },
+    
+    // Single quoted strings with interpolation
+    {
+      "regex": "'(?:\\\\.|[^'])*'",
+      "groupStyles": { "0": "string" }
+    },
+    
+    // String interpolation ${...}
+    { "type": "variable", "regex": "\\$\\{[^}]*\\}" },
+    
+    // Simple string interpolation $identifier
+    { "type": "variable", "regex": "\\$[a-zA-Z_$][\\w$]*" },
+    
+    // Raw triple double quoted strings
+    { "type": "string", "regex": "r\"\"\"[\\s\\S]*?\"\"\"" },
+    
+    // Raw triple single quoted strings
+    { "type": "string", "regex": "r'''[\\s\\S]*?'''" },
+    
+    // Raw double quoted strings
+    { "type": "string", "regex": "r\"(?:[^\"])*\"" },
+    
+    // Raw single quoted strings
+    { "type": "string", "regex": "r'(?:[^'])*'" },
+    
+    // String escape sequences
+    { "type": "strEscape", "regex": "\\\\u[0-9a-fA-F]{4}|\\\\x[0-9a-fA-F]{2}|\\\\[0-7]{1,3}|\\\\." },
+    
+    // Numbers
+    { "type": "number", "regex": "\\b\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?[fFdD]?\\b" },
+    { "type": "number", "regex": "\\b0[xX][0-9a-fA-F_]+\\b" },
+    { "type": "number", "regex": "\\b0[bB][01_]+\\b" },
+    { "type": "number", "regex": "\\b0[oO][0-7_]+\\b" },
+    
+    // Annotations
+    { "type": "meta", "regex": "@[a-zA-Z_$][\\w$]*(?:\\.[a-zA-Z_$][\\w$]*)*" },
+    
+    // Constants (UPPER_CASE)
+    { "type": "constant", "regex": "\\b[A-Z][A-Z0-9_]+\\b" },
+    
+    // Keywords
+    {
+      "type": "keyword",
+      "regex": "\\b(?:abstract|as|assert|async|await|break|case|catch|class|const|continue|covariant|default|deferred|do|dynamic|else|enum|export|extends|external|factory|false|final|finally|for|Function|get|if|implements|import|in|interface|is|library|mixin|new|null|on|operator|part|rethrow|return|set|static|super|switch|sync|this|throw|true|try|typedef|var|void|while|with|yield|late|required)\\b"
+    },
+    
+    // Built-in types
+    {
+      "type": "type",
+      "regex": "\\b(?:bool|double|int|List|Map|Never|Null|Object|String|Symbol|void|Future|Stream|Iterable|Set|DateTime|Duration|RegExp|Uri|Runes|Comparable|Matcher|Pattern|Stopwatch)\\b"
+    },
+    
+    // Function names (lowerCamelCase followed by parentheses)
+    { "type": "funName", "regex": "\\b[a-z][a-zA-Z_$\\d]*(?=\\s*\\()" },
+    
+    // Class names (UpperCamelCase)
+    { "type": "className", "regex": "\\b[A-Z][a-zA-Z_$\\d]*\\b" },
+    
+    // Cascade operator
+    { "type": "operator", "regex": "\\.\\." },
+    
+    // Arrow function
+    { "type": "operator", "regex": "=>" },
+    
+    // Operators
+    { "type": "operator", "regex": "[+\\-*/%<>=!&|^~?:]+|\\.\\.<|\\?\\?" },
+    
+    // Brackets
+    { "type": "bracket", "regex": "[(){}\\[\\]]" },
+    
+    // Separators
+    { "type": "separator", "regex": "[,;]" },
+    
+    // Default fallback
+    { "type": "default", "regex": "." }
+  ]
+}

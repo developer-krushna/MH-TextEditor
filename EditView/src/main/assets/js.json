@@ -1,0 +1,54 @@
+{
+  "name": ["JavaScript", ".js", ".es"],
+  "comment": [
+    { "startsWith": "//" },
+    { "startsWith": "/*", "endsWith": "*/" }
+  ],
+  
+  "rules": [
+    // Single-line comments
+    { "type": "comment", "regex": "//.*" },
+    
+    // Multi-line comments
+    { "type": "comment", "regex": "/\\*[\\s\\S]*?\\*/" },
+    
+    // Single quoted strings
+    { "type": "string", "regex": "'(?:\\\\.|[^'])*'" },
+    
+    // Double quoted strings
+    { "type": "string", "regex": "\"(?:\\\\.|[^\"])*\"" },
+    
+    // Template literals (backticks)
+    { "type": "string", "regex": "`(?:\\\\.|[^`])*`" },
+    
+    // String escape sequences
+    { "type": "strEscape", "regex": "\\\\u[0-9a-fA-F]{4}|\\\\x[0-9a-fA-F]{2}|\\\\[0-7]{1,3}|\\\\." },
+    
+    // Template literal expressions ${...}
+    { "type": "strEscape", "regex": "\\$\\{[^}]*\\}" },
+    
+    // Regular expressions - simplified pattern
+    { "type": "meta", "regex": "/(?:\\\\.|[^/\\n])*/[gimuy]*" },
+    
+    // Numbers
+    { "type": "number", "regex": "\\b\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?\\b" },
+    { "type": "number", "regex": "\\b0[xX][0-9a-fA-F]+\\b" },
+    { "type": "number", "regex": "\\b0[oO][0-7]+\\b" },
+    { "type": "number", "regex": "\\b0[bB][01]+\\b" },
+    
+    // Keywords - simplified without lookbehind
+    {
+      "type": "keyword",
+      "regex": "\\b(break|case|catch|class|const|continue|debugger|default|delete|do|else|enum|export|extends|false|finally|for|function|if|implements|import|instanceof|interface|let|new|null|package|private|protected|public|return|static|super|switch|this|with|throw|true|try|typeof|var|void|while|yield|function)\\b"
+    },
+    
+    // Operators
+    { "type": "operator", "regex": "[+\\-*/%=&|!<>^~?:]+" },
+    
+    // Punctuation
+    { "type": "operator", "regex": "[.,;(){}[\\]]" },
+    
+    // Default fallback
+    { "type": "default", "regex": "." }
+  ]
+}

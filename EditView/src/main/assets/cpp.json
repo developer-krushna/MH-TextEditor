@@ -1,0 +1,79 @@
+{
+  "name": ["C++", ".cpp", ".cxx", ".hpp", ".hxx", ".cc"],
+  "comment": [
+    { "startsWith": "//" },
+    { "startsWith": "/*", "endsWith": "*/" }
+  ],
+  
+  "rules": [
+    // Single-line and multi-line comments
+    { "type": "comment", "regex": "//.*" },
+    { "type": "comment", "regex": "/\\*[\\s\\S]*?\\*/" },
+    
+    // Quoted strings
+    { "type": "string", "regex": "\"(?:\\\\.|[^\"])*\"" },
+    { "type": "string", "regex": "'(?:\\\\.|[^'])'" },
+    
+    // Numbers
+    { "type": "number", "regex": "\\b\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?[fFdDlL]?\\b" },
+    
+    // Preprocessor directives (using meta type)
+    { 
+      "regex": "(?m)^[ \\t]*(#[ \\t]*include)(\\s*<.*?>)", 
+      "groupStyles": { "1": "meta", "2": "string" }
+    },
+    { 
+      "type": "meta", 
+      "regex": "(?m)^[ \\t]*#[ \\t]*\\S+" 
+    },
+    
+    // Standard C++ Keywords
+    {
+      "type": "keyword",
+      "keywords": [
+        "alignas", "alignof", "and", "and_eq", "asm", "auto", "bitand", "bitor", "bool", "break", 
+        "case", "catch", "char", "char8_t", "char16_t", "char32_t", "class", "compl", "concept", 
+        "const", "const_cast", "consteval", "constexpr", "sizeof", "continue", "co_await", 
+        "co_return", "co_yield", "decltype", "default", "delete", "do", "double", "dynamic_cast", 
+        "else", "enum", "explicit", "export", "extern", "false", "float", "for", "friend", "goto", 
+        "if", "inline", "int", "long", "xor", "mutable", "namespace", "new", "noexcept", "not", 
+        "not_eq", "nullptr", "operator", "or", "or_eq", "private", "xor_eq", "protected", "public", 
+        "register", "reinterpret_cast", "requires", "return", "short", "signed", "constinit", 
+        "static", "static_assert", "static_cast", "struct", "switch", "template", "this", 
+        "thread_local", "throw", "true", "try", "typedef", "typeid", "typename", "union", 
+        "unsigned", "using", "virtual", "void", "volatile", "wchar_t", "while"
+      ]
+    },
+    
+    // Microsoft C++ Keywords
+    {
+      "type": "keyword",
+      "keywords": [
+        "__alignof", "__asm", "__assume", "__based", "__cdecl", "__declspec", "__event", "__except", 
+        "__fastcall", "__finally", "__forceinline", "__hook", "__if_exists", "__if_not_exists", 
+        "__inline", "__int16", "__int32", "__int64", "__int8", "__interface", "__leave", "__m128", 
+        "__m128d", "__m128i", "__m64", "__w64", "__wchar_t", "__ptr32", "__ptr64", "__raise", 
+        "__restrict", "__single_inheritance", "__sptr", "__stdcall", "__super", "__thiscall", 
+        "__unaligned", "__unhook", "__uptr", "__uuidof", "__vectorcall", "__virtual_inheritance", 
+        "__multiple_inheritance"
+      ]
+    },
+    
+    // C++/CLI, C++/CX Keywords
+    {
+      "type": "keyword", 
+      "keywords": [
+        "__abstract", "__box", "__delegate", "__gc", "__identifier", "__nogc", "__noop", "__pin", 
+        "__property", "__sealed", "__try_cast", "__value", "abstract", "array", "as_friend", 
+        "delegate", "event", "finally", "gcnew", "generic", "initonly", "interior_ptr", "literal", 
+        "property", "safecast", "sealed"
+      ]
+    },
+    
+    // Operators
+    { "type": "operator", "regex": "[+\\-*/%=&|!<>^~?:]+|\\.|,|;|\\(|\\)|\\{|\\}|\\[|\\]" },
+    
+    // Default fallback
+    { "type": "default", "regex": "." }
+  ]
+}

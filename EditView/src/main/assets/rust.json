@@ -1,0 +1,139 @@
+{
+  "name": ["Rust", ".rs"],
+  "comment": [
+    { "startsWith": "//" },
+    { "startsWith": "//!" },
+    { "startsWith": "/*", "endsWith": "*/" }
+  ],
+  
+  "rules": [
+    // Shebang
+    { "type": "comment", "regex": "^#![^\\[\\r\\n][^\\r\\n]*" },
+    
+    // Doc comments - highlight as constant (must come before regular comments)
+    { "type": "constant", "regex": "\\/\\/\\/.*" },
+    { "type": "constant", "regex": "\\/\\/!.*" },
+    { "type": "constant", "regex": "\\/\\*\\*[\\s\\S]*?\\*\\/" },
+    
+    // Regular comments
+    { "type": "comment", "regex": "\\/\\/.*" },
+    { "type": "comment", "regex": "\\/\\*[\\s\\S]*?\\*\\/" },
+    
+    // TODO comments
+    { "type": "variable", "regex": "\\b(?:TODO|FIXME|XXX|NB|NOTE|SAFETY)\\b" },
+    
+    // Simple inner attributes like #![allow(unused)]
+    { "type": "label", "regex": "#!\\[[^\\]]*\\]" },
+    
+    // Attribute brackets
+    { "type": "label", "regex": "#\\[" },
+    { "type": "label", "regex": "\\]" },
+    
+    // Attribute name (derive, inline, repr, cfg, etc.)
+    { "type": "label", "regex": "(?<=#\\[)\\s*[a-zA-Z_][a-zA-Z0-9_]*" }, 
+    
+    // Macro variables - $identifier (but not $()
+    { "type": "label", "regex": "\\$[a-zA-Z_][a-zA-Z0-9_]*" },
+    
+    // Macro repetition operators - * + ? 
+    { "type": "keyword2", "regex": "(?<!\\.)[*+?](?![/=])" },
+    
+    // Module paths like std::collections, std::fmt
+    { "type": "constant", "regex": "\\b(?:std|core|alloc)::[a-zA-Z_][a-zA-Z0-9_]*(?:::[a-zA-Z_][a-zA-Z0-9_]*)*" },
+    
+    // Method calls - both .method() and Type::method()
+    { "type": "variable", "regex": "(?:(?<=\\.)|(?<=::))[a-zA-Z_][a-zA-Z0-9_]*(?=\\()" },
+    
+    // Standard library types and traits - MUST come before struct names
+    {
+      "type": "variable",
+      "regex": "\\b(?:Send|Sized|Sync|Unpin|Drop|Fn|FnMut|FnOnce|AsMut|AsRef|From|Into|DoubleEndedIterator|ExactSizeIterator|Extend|IntoIterator|Iterator|Clone|Copy|Default|Eq|Ord|PartialEq|PartialOrd|ToOwned|ToString|TryFrom|TryInto|FromIterator|Box|String|Vec|Option|None|Some|Result|Err|Ok|Future|IntoFuture|AsyncFn|AsyncFnMut|AsyncFnOnce|Debug|Hash|RustcEncodable|RustcDecodable|Encodable|Decodable|Rand|Show|FromPrimitive)\\b"
+    },
+    
+    // Struct/Enum names (UpperCamelCase) - but exclude known traits
+    { "type": "constant", "regex": "\\b[A-Z][a-zA-Z0-9_]*\\b" },
+    
+    // Strings - double quoted
+    { "type": "string", "regex": "[bc]?\"(?:\\\\.|[^\"])*\"" },
+    
+    // Raw strings
+    { "type": "string", "regex": "[bc]?r\"[^\"]*\"" },
+    { "type": "string", "regex": "[bc]?r#\"[^\"]*\"#" },
+    { "type": "string", "regex": "r##\"[^\"]*\"##" },
+    { "type": "string", "regex": "r###\"[^\"]*\"###" },
+    
+    // Character literals
+    { "type": "string", "regex": "b?'(?:\\\\.|[^'])'" },
+    
+    // String escape sequences
+    { "type": "strEscape", "regex": "\\\\u\\{[0-9a-fA-F_]+\\}|\\\\x[0-9a-fA-F]{2}|\\\\[nrt\\\\0\"']" },
+    
+    // Format macros
+    {
+      "type": "label",
+      "regex": "\\b(?:format|format_args|format_args_nl|const_format_args|print|println|eprint|eprintln|panic|todo|unimplemented|unreachable|write|writeln|assert|debug_assert|assert_eq|assert_ne|assert_matches|debug_assert_eq|debug_assert_ne|debug_assert_matches)!"
+    },
+    
+    // Numbers
+    { "type": "number", "regex": "\\b0[xX][0-9a-fA-F_]+\\b" },
+    { "type": "number", "regex": "\\b0[oO][0-7_]+\\b" },
+    { "type": "number", "regex": "\\b0[bB][01_]+\\b" },
+    { "type": "number", "regex": "\\b\\d[\\d_]*(?:\\.\\d[\\d_]*)?(?:[eE][+-]?[\\d_]+)?[fiu]?(?:8|16|32|64|128|size)?\\b" },
+    
+    // Function definitions
+    {
+      "regex": "\\b(fn)\\s+([a-zA-Z_][a-zA-Z0-9_]*)",
+      "groupStyles": { "1": "keyword", "2": "tagName" }
+    },
+    
+    // Union definitions
+    {
+      "regex": "\\b(union)\\s+([a-zA-Z_][a-zA-Z0-9_]*)",
+      "groupStyles": { "1": "keyword", "2": "type" }
+    },
+    
+    // Keywords
+    {
+      "type": "keyword",
+      "regex": "\\b(?:as|break|const|continue|crate|dyn|else|enum|extern|false|fn|for|if|impl|in|let|loop|match|mod|move|mut|pub|ref|return|static|struct|super|trait|true|type|unsafe|use|where|while|async|await|macro|try|yield|default|safe|auto|gen|union)\\b"
+    },
+    
+    // Built-in types
+    {
+      "type": "type", 
+      "regex": "\\b(?:bool|char|str|f16|f32|f64|f128|i8|i16|i32|i64|i128|isize|u8|u16|u32|u64|u128|usize)\\b"
+    },
+    
+    // Self types
+    { "type": "variable", "regex": "\\bSelf\\b" },
+    
+    // self value
+    { "type": "constant", "regex": "\\bself\\b" },
+    
+    // Path delimiter
+    { "type": "operator", "regex": "::" },
+    
+    // Macros
+    { "type": "label", "regex": "[a-zA-Z_][a-zA-Z0-9_]*!" },
+    
+    // Lifetimes
+    { "type": "meta", "regex": "'[a-zA-Z_][a-zA-Z0-9_]*" },
+    
+    // Labels
+    { "type": "label", "regex": "'[a-zA-Z_][a-zA-Z0-9_]*:" },
+    
+    // Operators
+    { "type": "operator", "regex": "[?]" },
+    { "type": "operator", "regex": "&&|\\|\\|" },
+    { "type": "operator", "regex": "=>" },
+    { "type": "operator", "regex": "[<!>=]=|[<>]" },
+    { "type": "operator", "regex": "[&~@*!]" },
+    { "type": "operator", "regex": "[+\\-*\\/%^&|]=" },
+    
+    // Punctuation
+    { "type": "operator", "regex": "[.,;(){}[\\]]" },
+    
+    // Default fallback
+    { "type": "default", "regex": "." }
+  ]
+}

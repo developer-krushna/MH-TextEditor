@@ -1,0 +1,69 @@
+{
+  "name": ["PHP", ".php"],
+  "comment": [
+    { "startsWith": "//" },
+    { "startsWith": "/*", "endsWith": "*/" }
+  ],
+  
+  "rules": [
+    // Single-line comments
+    { "type": "comment", "regex": "//.*" },
+    
+    // Multi-line comments
+    { "type": "comment", "regex": "/\\*[\\s\\S]*?\\*/" },
+    
+    // Hash comments
+    { "type": "comment", "regex": "#.*" },
+    
+    // Attributes
+    { "type": "meta", "regex": "#\\[.*?\\]" },
+    
+    // Double quoted strings
+    { "type": "string", "regex": "\"(?:\\\\.|[^\"])*\"" },
+    
+    // Single quoted strings
+    { "type": "string", "regex": "'(?:\\\\.|[^'])*'" },
+    
+    // Backtick strings
+    { "type": "string", "regex": "`(?:\\\\.|[^`])*`" },
+    
+    // String escape sequences
+    { "type": "strEscape", "regex": "\\\\." },
+    
+    // Numbers - decimal
+    { "type": "number", "regex": "\\b\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?\\b" },
+    
+    // Numbers - hex
+    { "type": "number", "regex": "\\b0[xX][0-9a-fA-F]+\\b" },
+    
+    // Numbers - octal
+    { "type": "number", "regex": "\\b0[0-7]+\\b" },
+    
+    // Numbers - binary
+    { "type": "number", "regex": "\\b0[bB][01]+\\b" },
+    
+    // Variables
+    { "type": "constant", "regex": "\\$\\w+" },
+    
+    // Keywords
+    {
+      "type": "keyword",
+      "regex": "\\b(?:abstract|and|as|break|callable|case|catch|class|clone|const|continue|declare|default|do|echo|else|elseif|enddeclare|endfor|endforeach|endif|endswitch|endwhile|extends|final|finally|fn|for|foreach|function|global|goto|if|match|implements|include|include_once|instanceof|insteadof|interface|namespace|new|or|print|private|protected|public|readonly|require|xor|require_once|return|static|switch|throw|trait|try|use|var|while|yield)\\b"
+    },
+    
+    // Built-in functions
+    {
+      "type": "keyword2",
+      "regex": "\\b(?:__halt_compiler|array|die|empty|eval|exit|isset|list|unset|echo|print_r|sort|htmlentities|mkdir|fopen|fread|rewind|fwrite|fclose|opendir|readdir|closedir|is_dir|is_link|readlink)\\b"
+    },
+    
+    // Operators
+    { "type": "operator", "regex": "[+\\-*/%=&|!<>^~?:]+" },
+    
+    // Punctuation
+    { "type": "operator", "regex": "[.,;(){}[\\]]" },
+    
+    // Default fallback
+    { "type": "default", "regex": "." }
+  ]
+}

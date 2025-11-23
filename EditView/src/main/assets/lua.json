@@ -1,0 +1,54 @@
+{
+  "name": ["Lua", ".lua"],
+  "comment": [
+    { "startsWith": "--" },
+    { "startsWith": "--[[", "endsWith": "]]" }
+  ],
+  
+  "rules": [
+    // Single-line comments
+    { "type": "comment", "regex": "--.*" },
+    
+    // Multi-line comments
+    { "type": "comment", "regex": "--\\[[\\s\\S]*?\\]\\]" },
+    
+    // Double quoted strings
+    { "type": "string", "regex": "\"(?:\\\\.|[^\"])*\"" },
+    
+    // Single quoted strings
+    { "type": "string", "regex": "'(?:\\\\.|[^'])*'" },
+    
+    // Numbers - decimal
+    { "type": "number", "regex": "\\b\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?\\b" },
+    
+    // Numbers - hex
+    { "type": "number", "regex": "\\b0[xX][0-9a-fA-F]+\\b" },
+    
+    // Types
+    {
+      "type": "type", 
+      "regex": "\\b(?:local|global|boolean|number|userdata)\\b"
+    },
+    
+    // Constants
+    {
+      "type": "constant",
+      "regex": "\\b(?:true|false|nil)\\b"
+    },
+    
+    // Keywords
+    {
+      "type": "keyword",
+      "regex": "\\b(?:return|then|while|and|break|do|else|elseif|end|for|function|if|in|not|or|repeat|until|thread|table)\\b"
+    },
+    
+    // Operators
+    { "type": "operator", "regex": "[+\\-*/%=&|!<>^~#:]+" },
+    
+    // Punctuation
+    { "type": "operator", "regex": "[.,;(){}[\\]]" },
+    
+    // Default fallback
+    { "type": "default", "regex": "." }
+  ]
+}

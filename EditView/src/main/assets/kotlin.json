@@ -1,0 +1,53 @@
+{
+  "name": ["Kotlin", ".kt"],
+  "comment": [
+    { "startsWith": "//" },
+    { "startsWith": "/*", "endsWith": "*/" }
+  ],
+  
+  "rules": [
+    // Single-line comments
+    { "type": "comment", "regex": "//.*" },
+    
+    // Multi-line comments
+    { "type": "comment", "regex": "/\\*[\\s\\S]*?\\*/" },
+    
+    // Triple quoted strings
+    {
+      "regex": "\"\"\"[\\s\\S]*?\"\"\"",
+      "groupStyles": { "0": "string" }
+    },
+    
+    // Double quoted strings
+    {
+      "regex": "\"(?:\\\\.|[^\"])*\"",
+      "groupStyles": { "0": "string" }
+    },
+    
+    // Single quoted characters
+    {
+      "regex": "'(?:\\\\.|[^'])'",
+      "groupStyles": { "0": "string" }
+    },
+    
+    // Numbers
+    { "type": "number", "regex": "\\b\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?[fFdDlL]?\\b" },
+    { "type": "number", "regex": "\\b0[xX][0-9a-fA-F]+\\b" },
+    { "type": "number", "regex": "\\b0[bB][01]+\\b" },
+    
+    // Annotations
+    { "type": "meta", "regex": "@\\w+" },
+    
+    // Keywords - using regex with word boundaries
+    {
+      "type": "keyword",
+      "regex": "\\b(?:as|break|class|continue|do|else|false|for|fun|if|in|interface|is|null|object|package|return|super|this|throw|true|try|typealias|typeof|val|var|when|while|catch|constructor|delegate|dynamic|finally|import|actual|abstract|annotation|companion|const|crossinline|data|enum|expect|external|final|infix|inline|inner|internal|lateinit|noinline|open|operator|out|override|private|protected|public|reified|sealed|suspend|tailrec|vararg)\\b"
+    },
+    
+    // Operators
+    { "type": "operator", "regex": "[+\\-*/%=&|!<>^~?:]+|\\.|,|;|\\(|\\)|\\{|\\}|\\[|\\]" },
+    
+    // Default fallback
+    { "type": "default", "regex": "." }
+  ]
+}

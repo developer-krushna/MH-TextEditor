@@ -1,0 +1,42 @@
+{
+  "name": ["C", ".c", ".h"],
+  "comment": [
+    { "startsWith": "//" },
+    { "startsWith": "/*", "endsWith": "*/" }
+  ],
+  
+  "rules": [
+    // Single-line and multi-line comments
+    { "type": "comment", "regex": "//.*" },
+    { "type": "comment", "regex": "/\\*[\\s\\S]*?\\*/" },
+    
+    // Quoted strings
+    { "type": "string", "regex": "\"(?:\\\\.|[^\"])*\"" },
+    { "type": "string", "regex": "'(?:\\\\.|[^'])'" },
+    
+    // Numbers
+    { "type": "number", "regex": "\\b\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?[fFdDlL]?\\b" },
+    
+    // Preprocessor directives
+    { 
+      "regex": "(?m)^[ \\t]*(#[ \\t]*include)(\\s*<.*?>)", 
+      "groupStyles": { "1": "meta", "2": "string" }
+    },
+    { 
+      "type": "meta", 
+      "regex": "(?m)^[ \\t]*#[ \\t]*\\S+" 
+    },
+    
+    // Keywords
+    {
+      "type": "keyword",
+      "regex": "\\b(?:auto|break|case|char|const|continue|default|do|double|else|enum|extern|float|for|goto|if|int|long|register|return|short|signed|sizeof|static|struct|switch|typedef|union|unsigned|void|volatile|while|inline|restrict|_Bool|_Complex|_Imaginary|_Alignas|_Alignof|_Atomic|_Static_assert|_Noreturn|_Thread_local|_Generic)\\b"
+    },
+    
+    // Operators
+    { "type": "operator", "regex": "[+\\-*/%=&|!<>^~?:]+|\\.|,|;|\\(|\\)|\\{|\\}|\\[|\\]" },
+    
+    // Default fallback
+    { "type": "default", "regex": "." }
+  ]
+}
