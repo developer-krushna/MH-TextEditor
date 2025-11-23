@@ -1,0 +1,54 @@
+[
+    {
+        "Syntax": "C",
+        "Path": "c.json"
+    },
+    {
+        "Syntax": "C++",
+        "Path": "cpp.json"
+    },
+    {
+        "Syntax": "Dart",
+        "Path": "dart.json"
+    },
+    {
+        "Syntax": "Json",
+        "Path": "json.json"
+    },
+    {
+        "Syntax": "Java",
+        "Path": "java.json"
+    },
+    {
+        "Syntax": "JavaScript",
+        "Path": "js.json"
+    },
+    {
+        "Syntax": "Kotlin",
+        "Path": "kotlin.json"
+    },
+    {
+        "Syntax": "Lua",
+        "Path": "lua.json"
+    },
+    {
+        "Syntax": "Php",
+        "Path": "php.json"
+    },
+    {
+        "Syntax": "Python",
+        "Path": "python.json"
+    },
+    {
+        "Syntax": "Rust",
+        "Path": "rust.json"
+    },
+    {
+        "Syntax": "Smali",
+        "Path": "smali.json"
+    },
+    {
+        "Syntax": "Xml",
+        "Path": "xml.json"
+    }
+]
