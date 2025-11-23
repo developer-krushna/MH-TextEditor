@@ -27,6 +27,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="modder.hub.editor" >
 
-    <uses-sdk android:minSdkVersion="14" />
+    <uses-sdk android:minSdkVersion="23" />
 
 </manifest>
