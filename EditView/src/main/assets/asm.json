@@ -1,0 +1,71 @@
+{
+  "name": ["Asm", ".s", ".a", ".mac", ".lst", ".asm", ".nasm", ".masm", ".mar"],
+  "ignoreCase": true,
+  "comment": [
+    { "startsWith": ";" },
+    { "startsWith": "#" },
+    { "startsWith": "!" },
+    { "startsWith": "|" },
+    { "startsWith": "//" },
+    { "startsWith": "/*", "endsWith": "*/" }
+  ],
+  "styles": {
+    "directive": { "day": "#58908A", "night": "#58908A" },
+    "macro": "namespace"
+  },
+  "rules": [
+    // Comments
+    { "type": "comment", "regex": "(?m)(?:[;|]|^#|[#!](?!\\d)|\\/\\/).*" },
+    { "type": "comment", "regex": "/\\*[\\s\\S]*?\\*/" },
+
+    // Data Directives (long, ascii, etc.)
+    {
+      "type": "keyword2",
+      "regex": "\\.(?:long|ascii|asciz|byte|double|float|hword|int|octa|quad|short|single|space|string|word|2byte|4byte|8byte)\\b"
+    },
+
+    // Conditional Directives
+    {
+      "type": "macro",
+      "regex": "\\.(?:if|iff|if_false|if_true|ift|iftf|iif|else|endif|irp|iprc|repeat|rept|endr)\\b"
+    },
+
+    // Macro Directives
+    {
+      "type": "macro",
+      "regex": "\\.(?:include|library|macro|mexit|endm|mcall|mdelete)\\b"
+    },
+
+    // General Directives (custom style)
+    {
+      "type": "directive",
+      "regex": "\\.[a-z][a-z\\d_\\-.]*\\b:?"
+    },
+
+    // Labels
+    {
+      "type": "label",
+      "regex": "(?<!:)\\.?\\b[a-z][a-z\\d_\\-.]*:"
+    },
+
+    // Commands/Instructions
+    {
+      "type": "keyword",
+      "regex": "(?m)^\\s*[a-z][a-z\\d_\\-.]*\\b"
+    },
+
+    // Special symbols
+    {
+      "type": "meta",
+      "regex": "[#!%.@$~?]|:[a-z][a-z\\d_\\-.]*:"
+    },
+
+    // Operators
+    { "type": "operator", "regex": "[\\[\\]+\\-*\\/=&<>]" },
+    { "type": "keyword", "regex": "," },
+
+    // Numbers and Strings
+    { "type": "number", "regex": "\\b\\d+(\\.\\d+)?\\b" },
+    { "type": "string", "regex": "\"(?:\\\\.|[^\"])*\"" }
+  ]
+}

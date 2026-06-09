@@ -1,11 +1,19 @@
 [
     {
+        "Syntax": "Asm",
+        "Path": "asm.json"
+    },
+    {
         "Syntax": "C",
         "Path": "c.json"
     },
     {
         "Syntax": "C++",
         "Path": "cpp.json"
+    },
+    {
+        "Syntax": "CSS",
+        "Path": "css.json"
     },
     {
         "Syntax": "Dart",
@@ -42,6 +50,10 @@
     {
         "Syntax": "Rust",
         "Path": "rust.json"
+    },
+    {
+        "Syntax": "Shell",
+        "Path": "sh.json"
     },
     {
         "Syntax": "Smali",

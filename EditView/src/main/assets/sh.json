@@ -1,0 +1,52 @@
+{
+  "name": ["Shell", ".sh", ".rc", ".bash", ".bashrc", ".ash", ".zsh", ".zshrc"],
+  "ignoreCase": false,
+  "comment": [
+    { "startsWith": "#" }
+  ],
+  "styles": {
+    "funDefName": { "day": "#C57633", "night": "#F6C87B" },
+    "funName": { "day": "#3071B9", "night": "#C17C41" }
+  },
+  "rules": [
+    { "type": "comment", "regex": "(?m)^[ \\t]*#.*$" },
+
+    // Variables: $VAR, ${VAR}, $1, $#
+    { "type": "variable", "regex": "\\$(?:[a-zA-Z_]\\w*|[0-9#*@?$!\\-])" },
+    { "type": "variable", "regex": "\\$\\{[^}]+\\}" },
+
+    // Keywords
+    {
+      "type": "keyword",
+      "keywords": [
+        "if", "then", "else", "elif", "fi", "for", "while", "in", "do", "done", "case", "esac", "function",
+        "break", "continue", "exit", "return", "local", "export", "alias", "unalias", "shift", "type", "readonly"
+      ]
+    },
+
+    // Function Definitions
+    { "regex": "(?m)^[ \\t]*(?:function[ \\t]+)?([\\w\\-]+)[ \\t]*\\(", "groupStyles": { "1": "funDefName" } },
+
+    // Function/Command calls
+    { "regex": "(?m)(?<=[;&\\{\\|]|(?<!\\\\\\n)^)[ \\t]*([.\\-\\/@#:\\w]+)\\b(?![ \\t]*\\+?=)", "groupStyles": { "1": "funName" } },
+
+    // Arithmetic extensions $(( ... ))
+    { "type": "keyword", "regex": "\\$\\(\\(" },
+    { "type": "keyword", "regex": "\\)\\)" },
+
+    // Strings
+    { "type": "string", "regex": "\"(?:\\\\.|[^\"])*\"" },
+    { "type": "string", "regex": "'[^']*'" },
+    { "type": "string", "regex": "\\$'[^']*'" },
+
+    // Backticks `command`
+    { "type": "funName", "regex": "`[^`]*`" },
+
+    // Numbers
+    { "type": "number", "regex": "(?<![.+*%@\\/\\-])\\b\\d+\\b(?![.+*%@\\/\\-])" },
+    { "type": "number", "regex": "\\b0x[0-9A-F]+\\b" },
+
+    // Operators
+    { "type": "operator", "regex": "[\\|\\&;<>\\(\\)\\{\\}\\!\\=\\+\\-\\*\\/]" }
+  ]
+}

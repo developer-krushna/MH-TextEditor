@@ -1,0 +1,64 @@
+{
+  "name": ["CSS", ".css"],
+  "comment": [
+    { "startsWith": "/*", "endsWith": "*/" }
+  ],
+  "ignoreCase": true,
+  "rules": [
+    // 1. Comments
+    { "type": "comment", "regex": "(?i)/\\*[\\s\\S]*?\\*/" },
+
+    // 2. Strings
+    { "type": "string", "regex": "(?i)\"(?:\\\\.|[^\"])*\"" },
+    { "type": "string", "regex": "(?i)'(?:\\\\.|[^'])*'" },
+
+    // 3. url() function - should be handled before general values
+    { "regex": "(?i)\\b(url)\\s*\\(([^)]*)\\)", "groupStyles": { "1": "keyword", "2": "string" } },
+
+    // 4. Numbers, Hex Colors, and Units
+    { "type": "number", "regex": "(?i)#([0-9a-fA-F]{3,8})\\b" },
+    { "type": "number", "regex": "(?i)\\b\\d+(\\.\\d+)?(%|ch|cm|deg|dpcm|dpi|dppx|em|ex|fr|grad|hz|in|khz|mm|ms|pc|pt|px|q|rad|rem|s|turn|vh|vmax|vmin|vw)\\b" },
+    { "type": "number", "regex": "(?i)\\b\\d+(\\.\\d+)?\\b" },
+
+    // 5. Preprocessor / At-rules
+    { "type": "meta", "regex": "(?i)@(?:media|import|charset|namespace|supports|document|keyframes|font-face|page|layer|property)\\b" },
+    { "type": "meta", "regex": "(?i)!important\\b" },
+
+    // 6. Selectors
+    { "type": "operator", "regex": "(?i)#[a-zA-Z][\\w-]*" },
+    { "type": "constant", "regex": "(?i)\\.[a-zA-Z][\\w-]*" },
+    { "type": "operator", "regex": "(?i)::?[a-zA-Z][\\w-]*" },
+
+    // Tag Names (Selectors)
+    {
+      "type": "keyword2",
+      "keywords": [
+        "html", "body", "head", "title", "meta", "link", "script", "style",
+        "div", "span", "section", "article", "aside", "nav", "header", "footer", "main", "figure", "figcaption",
+        "h1", "h2", "h3", "h4", "h5", "h6", "p", "blockquote", "pre", "code", "kbd", "samp", "var",
+        "a", "abbr", "b", "i", "strong", "em", "small", "mark", "del", "ins", "sub", "sup",
+        "ul", "ol", "li", "dl", "dt", "dd", "table", "thead", "tbody", "tfoot", "tr", "th", "td", "caption", "colgroup", "col",
+        "form", "input", "button", "select", "option", "optgroup", "textarea", "label", "fieldset", "legend",
+        "img", "picture", "source", "video", "audio", "track", "canvas", "svg", "iframe", "embed", "object", "param",
+        "address", "time", "progress", "meter", "details", "summary", "dialog"
+      ]
+    },
+
+    // 7. Properties and Values
+    // Property Names (followed by :)
+    { "regex": "(?i)\\b([a-zA-Z-][\\w-]*)\\s*:", "groupStyles": { "1": "keyword" } },
+
+    // CSS Functions (calc, var, etc.)
+    { "regex": "(?i)\\b(calc|var|rgb|rgba|hsl|hsla|linear-gradient|radial-gradient|translate|scale|rotate|skew|matrix|blur)\\s*\\(", "groupStyles": { "1": "keyword" } },
+
+    // Property Values (Anything after : or , that isn't a property name or selector)
+    // Matches Arial, sans-serif, normal, block, etc.
+    { "type": "label", "regex": "(?i)(?<=[:\\s,])([a-zA-Z-][\\w-]*)\\b" },
+
+    // Custom Properties
+    { "type": "variable", "regex": "(?i)--[\\w-]+" },
+
+    // 8. Operators and Punctuation
+    { "type": "operator", "regex": "[\\{\\}\\(\\)\\[\\]\\.,:;\\/*\\!\\&\\>\\+\\~\\|\\^\\$\\*\\=]" }
+  ]
+}
