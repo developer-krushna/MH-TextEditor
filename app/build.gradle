@@ -4,12 +4,13 @@ plugins {
 
 android {
     namespace = "modder.hub.editor"
-    compileSdk = 33
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "modder.hub.editor"
-        minSdk = 24
-        targetSdk = 33
+        minSdk = 21
+         //noinspection ExpiredTargetSdkVersion
+        targetSdk = 28
         versionCode = 1
         versionName = "1.0"
     }
