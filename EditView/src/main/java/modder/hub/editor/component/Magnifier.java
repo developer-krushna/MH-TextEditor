@@ -1,37 +1,37 @@
 /*
-* MH-TextEditor - An Advanced and optimized TextEditor for android
-* Copyright 2025, developer-krushna
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following conditions are
-* met:
-*
-*     * Redistributions of source code must retain the above copyright
-* notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above
-* copyright notice, this list of conditions and the following disclaimer
-* in the documentation and/or other materials provided with the
-* distribution.
-*     * Neither the name of developer-krushna nor the names of its
-* contributors may be used to endorse or promote products derived from
-* this software without specific prior written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-* A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-* OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-* SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-* LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-* DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-* THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-* (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-* OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * MH-TextEditor - An Advanced and optimized TextEditor for android
+ * Copyright 2025-26, developer-krushna
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are
+ * met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ * notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above
+ * copyright notice, this list of conditions and the following disclaimer
+ * in the documentation and/or other materials provided with the
+ * distribution.
+ *     * Neither the name of developer-krushna nor the names of its
+ * contributors may be used to endorse or promote products derived from
+ * this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
-*     Please contact Krushna by email modder-hub@zohomail.in if you need
-*     additional information or have any questions
-*/
+ *     Please contact Krushna by email modder-hub@zohomail.in if you need
+ *     additional information or have any questions
+ */
 
 package modder.hub.editor.component;
 
@@ -49,11 +49,14 @@ import android.view.View;
 import android.widget.ImageView;
 import android.widget.PopupWindow;
 import modder.hub.editor.EditView;
-import modder.hub.editor.R;
+import modder.hub.editor.lib.R;
 
 /**
+ * Author - @developer-krushna
+ * optimized by AI
  * Magnifier specially designed for EditView Provides a popup magnifying glass effect for text
- * editing Originally replicated from Sora Code Editor for Android
+ * editing Optimized for smooth capture and positioning like MT Manager.
+ * Got idea from sora editor
  */
 public class Magnifier {
 
@@ -63,11 +66,16 @@ public class Magnifier {
     private final Paint paint;
     private final float maxTextSize;
 
-    private int viewX, viewY; // View-relative coordinates for positioning
-    private int contentX, contentY; // Content-relative coordinates for capture
+    private float viewX, viewY; // View-relative coordinates for positioning
     private boolean enabled = true;
-    private View parentView;
-    private float scaleFactor;
+    private final View parentView;
+    private final float scaleFactor;
+
+    private Bitmap destBitmap;
+    private Canvas destCanvas;
+    private Bitmap captureBitmap;
+    private Canvas captureCanvas;
+    private final PorterDuffXfermode srcInMode = new PorterDuffXfermode(PorterDuff.Mode.SRC_IN);
 
     public Magnifier(EditView editor) {
         this.editor = editor;
@@ -75,78 +83,79 @@ public class Magnifier {
 
         // Initialize popup window
         popup = new PopupWindow();
-        popup.setElevation(dpToPx(4));
+        popup.setElevation(dpToPx(12)); // Higher elevation for cleaner look
 
         @SuppressLint("InflateParams")
         View view = LayoutInflater.from(editor.getContext()).inflate(R.layout.magnifier_popup, null);
         image = view.findViewById(R.id.magnifier_image_view);
 
-        // Set popup dimensions
-        popup.setHeight((int) dpToPx(60)); // Slightly reduced height for compactness
-        popup.setWidth((int) dpToPx(80)); // Reduced initial width
+        // Wider and clearer display
+        popup.setHeight((int) dpToPx(60));
+        popup.setWidth((int) dpToPx(170));
         popup.setContentView(view);
 
         // Initialize text size limits and scaling
-        maxTextSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, 28,
+        // Cap magnifier at 28dp text size to avoid "over zoom" when text is already large
+        maxTextSize = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 28,
                 editor.getResources().getDisplayMetrics());
-        scaleFactor = 1.25f;
-        paint = new Paint();
+        scaleFactor = 1.5f; // More conservative scale
+        paint = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
     }
 
     // ==================== PUBLIC METHODS ====================
 
     /** Show magnifier at specified view coordinates */
-    public void show(int viewX, int viewY) {
+    public void show(float viewX, float viewY) {
         if (!enabled) {
             return;
         }
-        if (Math.abs(viewX - this.viewX) < 2 && Math.abs(viewY - this.viewY) < 2) {
+
+        // Extremely low threshold for ultra-smooth updates
+        if (Math.abs(viewX - this.viewX) < 3f && Math.abs(viewY - this.viewY) < 1f && isShowing()) {
+            // Position close enough — skip popup.update() but still refresh bitmap content
+            updateDisplayWithinEditor();
             return;
         }
-
         if (getEditorTextSize() > maxTextSize) {
             if (isShowing()) {
+                editor.post(new Runnable() {
+                    @Override
+                    public void run() {
+                        if (!isShowing() || destBitmap == null || destBitmap.isRecycled()) return;
+                        renderCapture();
+                    }
+                });
                 dismiss();
             }
             return;
         }
 
-        popup.setWidth(Math.min(editor.getWidth() * 2 / 5, (int) dpToPx(150))); // Reduced dynamic
-                                                                                // width (2/5 and
-                                                                                // 150dp max)
         this.viewX = viewX;
         this.viewY = viewY;
-
-        int scrollX = editor.getScrollX();
-        int scrollY = editor.getScrollY();
-        this.contentX = viewX + scrollX;
-        this.contentY = viewY + scrollY;
 
         // Get screen coordinates
         int[] pos = new int[2];
         editor.getLocationOnScreen(pos);
 
-        // Calculate popup position in screen coordinates using view-relative
-        int screenX = pos[0] + viewX;
-        int screenY = pos[1] + viewY;
+        // Calculate popup position in screen coordinates
+        float screenX = pos[0] + viewX;
+        float screenY = pos[1] + viewY;
 
-        // Position magnifier above the cursor with proper offset
-        int popupLeft = screenX - popup.getWidth() / 2;
-        int popupTop = screenY - popup.getHeight() - getEditorLineHeight();
+        int popupLeft = (int) (screenX - popup.getWidth() / 2f);
+        int verticalOffset = (int) dpToPx(65); // More space above cursor to avoid covering text
+        int popupTop = (int) (screenY - popup.getHeight() - verticalOffset);
 
         // Ensure popup stays within screen bounds
         DisplayMetrics metrics = editor.getResources().getDisplayMetrics();
         int screenWidth = metrics.widthPixels;
-        int screenHeight = metrics.heightPixels;
 
-        popupLeft = Math.max(0, Math.min(popupLeft, screenWidth - popup.getWidth()));
-        popupTop = Math.max(0, Math.min(popupTop, screenHeight - popup.getHeight()));
-
-        // If there's not enough space above, put it below
-        if (popupTop < 0) {
-            popupTop = screenY + getEditorLineHeight();
-            popupTop = Math.min(popupTop, screenHeight - popup.getHeight());
+        // Safety: If touching top of screen, show magnifier below
+        if (popupTop < dpToPx(5)) {
+            popupTop = (int) (screenY + getEditorLineHeight() + dpToPx(35));
         }
+
+        // Clamp horizontally
+        popupLeft = Math.max(0, Math.min(popupLeft, screenWidth - popup.getWidth()));
 
         if (popup.isShowing()) {
             popup.update(popupLeft, popupTop, popup.getWidth(), popup.getHeight());
@@ -164,13 +173,22 @@ public class Magnifier {
     /** Dismiss the magnifier */
     public void dismiss() {
         popup.dismiss();
+        image.setImageBitmap(null); // clear before recycle
+        if (destBitmap != null) {
+            destBitmap.recycle();
+            destBitmap = null;
+            destCanvas = null;
+        }
+        if (captureBitmap != null) {
+            captureBitmap.recycle();
+            captureBitmap = null;
+            captureCanvas = null;
+        }
     }
 
     /** Update the magnifier display */
     public void updateDisplay() {
-        if (!isShowing()) {
-            return;
-        }
+        if (!isShowing()) return;
         updateDisplayWithinEditor();
     }
 
@@ -207,157 +225,73 @@ public class Magnifier {
 
     /** Update the magnifier content by capturing and scaling editor content */
     private void updateDisplayWithinEditor() {
-        if (popup.getWidth() <= 0 || popup.getHeight() <= 0) {
+        // Post the capture to next frame so editor has finished its own redraw first
+        editor.post(new Runnable() {
+            @Override
+            public void run() {
+                if (!isShowing()) return;
+                renderCapture();
+            }
+        });
+    }
+
+    private void renderCapture() {
+        int width = popup.getWidth();
+        int height = popup.getHeight();
+        if (width <= 0 || height <= 0) {
             dismiss();
             return;
         }
 
-        int totalContentHeight = editor.getLineCount() * getEditorLineHeight();
-        int totalContentWidth = editor.getLeftSpace() + editor.getLineWidth() + editor.getSpaceWidth() * 4; // Full content width based on max line
+        if (destBitmap == null || destBitmap.getWidth() != width || destBitmap.getHeight() != height) {
+            if (destBitmap != null) destBitmap.recycle();
+            destBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+            destCanvas = new Canvas(destBitmap);
+        }
+
+        // Capture at full resolution to avoid "picture" blurriness
+        if (captureBitmap == null || captureBitmap.getWidth() != width || captureBitmap.getHeight() != height) {
+            if (captureBitmap != null) captureBitmap.recycle();
+            captureBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+            captureCanvas = new Canvas(captureBitmap);
+        }
+
         int scrollX = editor.getScrollX();
         int scrollY = editor.getScrollY();
+        float contentX = viewX + scrollX;
+        float contentY = viewY + scrollY;
 
-        // Recompute content in case of scroll during magnifier (rare)
-        int contentX = viewX + scrollX;
-        int contentY = viewY + scrollY;
+        captureBitmap.eraseColor(0);
+        captureCanvas.save();
+        
+        // High-quality rendering: Scale the canvas, not the result bitmap
+        captureCanvas.translate(width / 2f, height / 2f);
+        captureCanvas.scale(scaleFactor, scaleFactor);
+        captureCanvas.translate(-contentX, -contentY);
+        captureCanvas.translate(editor.getPaddingLeft(), editor.getPaddingTop());
+        
+        editor.drawMatchText(captureCanvas);
+        editor.drawLineBackground(captureCanvas);
+        editor.drawEditableText(captureCanvas);
+        editor.drawSelectHandle(captureCanvas);
+        editor.drawCursor(captureCanvas);
+        captureCanvas.restore();
 
-        Bitmap dest = Bitmap.createBitmap(popup.getWidth(), popup.getHeight(), Bitmap.Config.ARGB_8888);
-        int requiredWidth = (int) (popup.getWidth() / scaleFactor);
-        int requiredHeight = (int) (popup.getHeight() / scaleFactor);
-
-        // Calculate capture area in content coordinates
-        int left = Math.max(contentX - requiredWidth / 2, 0);
-        int top = Math.max(contentY - requiredHeight / 2, 0);
-        int right = Math.min(left + requiredWidth, totalContentWidth);
-        int bottom = Math.min(top + requiredHeight, totalContentHeight);
-
-        // Adjust for edges
-        if (right - left < requiredWidth) {
-            left = Math.max(0, right - requiredWidth);
-        }
-        if (bottom - top < requiredHeight) {
-            top = Math.max(0, bottom - requiredHeight);
-        }
-
-        // Special handling for bottom of document
-        if (contentY > totalContentHeight - getEditorLineHeight() * 3) {
-            // Near bottom of content - show area above cursor
-            top = Math.max(0, contentY - requiredHeight);
-            bottom = Math.min(top + requiredHeight, totalContentHeight);
-        }
-
-        if (right - left <= 0 || bottom - top <= 0) {
-            dismiss();
-            dest.recycle();
-            return;
-        }
-
-        int actualWidth = right - left;
-        int actualHeight = bottom - top;
-
-        Bitmap clip = Bitmap.createBitmap(actualWidth, actualHeight, Bitmap.Config.ARGB_8888);
-        Canvas viewCanvas = new Canvas(clip);
-        // Translate to align content area to clip
-        viewCanvas.translate(-left, -top);
-        // Clip to the content area in post-translate coordinates
-        viewCanvas.clipRect(left, top, right, bottom);
-
-        // Draw editor content without scroll translation
-        editor.drawMatchText(viewCanvas);
-        editor.drawLineBackground(viewCanvas);
-        editor.drawEditableText(viewCanvas);
-        editor.drawSelectHandle(viewCanvas);
-        editor.drawCursor(viewCanvas);
-
-        Bitmap scaled = Bitmap.createScaledBitmap(clip, popup.getWidth(), popup.getHeight(), true);
-        clip.recycle();
-
-        Canvas canvas = new Canvas(dest);
+        destBitmap.eraseColor(0);
         paint.reset();
         paint.setAntiAlias(true);
-        canvas.drawARGB(0, 0, 0, 0);
-        final int roundFactor = 6;
-        canvas.drawRoundRect(0, 0, popup.getWidth(), popup.getHeight(), dpToPx(roundFactor), dpToPx(roundFactor), paint);
-        paint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.SRC_IN));
-        canvas.drawBitmap(scaled, 0, 0, paint);
-        scaled.recycle();
+        paint.setFilterBitmap(true);
 
-        image.setImageBitmap(dest);
-    }
+        float cornerRadius = dpToPx(15);
+        destCanvas.drawRoundRect(0, 0, width, height, cornerRadius, cornerRadius, paint);
 
-    /** Calculate the capture area bounds with edge protection */
-    private Rect calculateCaptureBounds(int contentX, int contentY, int requiredWidth,
-            int requiredHeight, int totalContentWidth, int totalContentHeight) {
-        int left = Math.max(contentX - requiredWidth / 2, 0);
-        int top = Math.max(contentY - requiredHeight / 2, 0);
-        int right = Math.min(left + requiredWidth, totalContentWidth);
-        int bottom = Math.min(top + requiredHeight, totalContentHeight);
+        paint.setXfermode(srcInMode);
+        // Draw capture directly (1:1) into dest for crispness
+        destCanvas.drawBitmap(captureBitmap, 0, 0, paint);
+        paint.setXfermode(null);
 
-        // Adjust for edges
-        if (right - left < requiredWidth) {
-            left = Math.max(0, right - requiredWidth);
-        }
-        if (bottom - top < requiredHeight) {
-            top = Math.max(0, bottom - requiredHeight);
-        }
-
-        // Special handling for bottom of document
-        if (contentY > totalContentHeight - getEditorLineHeight() * 3) {
-            // Near bottom of content - show area above cursor
-            top = Math.max(0, contentY - requiredHeight);
-            bottom = Math.min(top + requiredHeight, totalContentHeight);
-        }
-
-        return new Rect(left, top, right - left, bottom - top);
-    }
-
-    /** Capture, scale and display the magnified content */
-    private void displayMagnifiedContent(Bitmap dest, Rect captureBounds, int scrollX, int scrollY) {
-        // Create clip bitmap from capture area
-        Bitmap clip = Bitmap.createBitmap(captureBounds.width, captureBounds.height, Bitmap.Config.ARGB_8888);
-        Canvas viewCanvas = new Canvas(clip);
-
-        // Translate to align content area to clip
-        viewCanvas.translate(-(captureBounds.left + scrollX), -(captureBounds.top + scrollY));
-
-        // Draw editor content to clip
-        editor.drawEditorContent(viewCanvas, captureBounds.top, captureBounds.bottom);
-
-        // Scale clip to popup size
-        Bitmap scaled = Bitmap.createScaledBitmap(clip, popup.getWidth(), popup.getHeight(), true);
-        clip.recycle();
-
-        // Apply rounded corners to destination
-        Canvas canvas = new Canvas(dest);
-        paint.reset();
-        paint.setAntiAlias(true);
-        canvas.drawARGB(0, 0, 0, 0);
-
-        final int roundFactor = 6;
-        canvas.drawRoundRect(0, 0, popup.getWidth(), popup.getHeight(),
-                dpToPx(roundFactor), dpToPx(roundFactor), paint);
-
-        // Apply source-in mode for rounded corners
-        paint.setXfermode(new PorterDuffXfermode(PorterDuff.Mode.SRC_IN));
-        canvas.drawBitmap(scaled, 0, 0, paint);
-        scaled.recycle();
-
-        // Set the final bitmap to image view
-        image.setImageBitmap(dest);
-    }
-
-    /** Simple rectangle helper class */
-    private static class Rect {
-        final int left, top, width, height;
-        final int right, bottom;
-
-        Rect(int left, int top, int width, int height) {
-            this.left = left;
-            this.top = top;
-            this.width = width;
-            this.height = height;
-            this.right = left + width;
-            this.bottom = top + height;
-        }
+        // at the very end, before image.setImageBitmap
+        if (destBitmap == null || destBitmap.isRecycled()) return;
+        image.setImageBitmap(destBitmap);
     }
 }

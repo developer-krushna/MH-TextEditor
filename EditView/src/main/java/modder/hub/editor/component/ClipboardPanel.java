@@ -1,6 +1,6 @@
 /*
 * MH-TextEditor - An Advanced and optimized TextEditor for android
-* Copyright 2025, developer-krushna
+* Copyright 2025-26, developer-krushna
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -71,7 +71,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import modder.hub.editor.EditView;
-import modder.hub.editor.R;
+import modder.hub.editor.lib.R;
 import modder.hub.editor.treeObserver.OnComputeInternalInsetsListener;
 import modder.hub.editor.treeObserver.ViewTreeObserverReflection;
 import modder.hub.editor.utils.LinkChecker;
@@ -81,20 +81,17 @@ import modder.hub.editor.utils.menuUtils.MenuItemData;
 import modder.hub.editor.utils.menuUtils.ViewFader;
 import org.json.JSONArray;
 import org.json.JSONObject;
-
-/*
- * Author : @developer-krushna (Krushna Chandra)
- * Ideas copied from Android System FloatingToolBar.java class
- * Fixed bug, comments, and optimization done by ChatGPT
+/**
+ * Author - @developer-krushna
+ *  A perfect android animation based Text selection window
+ *  having lots of fetures to customize menu items , including sequence and menu show mode
+ * optimized and comments by AI
+ * got the animation idea from android system FloatingToolbar.java
  */
-
 public class ClipboardPanel {
-    // ===============================================
-    // CLASS VARIABLES AND CONSTANTS
-    // ===============================================
 
     protected EditView _editView;
-    private Context _context;
+    private final Context _context;
 
     // Custom popup menu variables
     private PopupWindow _customPopupWindow;
@@ -107,16 +104,14 @@ public class ClipboardPanel {
     private boolean _isExpanded = false;
     private boolean _isAnimating = false;
 
-    private Rect _caretRect;
-    private boolean _isSelectionMode;
+    private Rect _preferredRect;
 
     // Menu display mode
     private MenuDisplayMode _menuDisplayMode = MenuDisplayMode.ICON_ONLY;
 
     // Menu item dimensions
-    private int _menuItemHeight;
-    private int _menuItemMinWidth;
-    private int _menuIconSize;
+    private final int _menuItemHeight;
+    private final int _menuIconSize;
 
     // Sizes
     private int _primaryWidth;
@@ -126,19 +121,15 @@ public class ClipboardPanel {
 
     // Overflow management
     private boolean _hasOverflow = false;
-    private ArrayList<MenuItemData> _overflowItems = new ArrayList<>();
+    private final ArrayList<MenuItemData> _overflowItems = new ArrayList<>();
 
     // Menu items list in JSON order
-    private ArrayList<String> _menuItems = new ArrayList<>();
-    private Map<String, MenuItemConfig> _allMenuItems = new HashMap<>();
+    private final ArrayList<String> _menuItems = new ArrayList<>();
+    private final Map<String, MenuItemConfig> _allMenuItems = new HashMap<>();
 
-    // Animation variables
-    private AnimationSet _openOverflowAnimation = new AnimationSet(true);
-    private AnimationSet _closeOverflowAnimation = new AnimationSet(true);
-
-    private Handler _autoHideHandler = new Handler();
+    private final Handler _autoHideHandler = new Handler();
     private static final long AUTO_HIDE_DELAY = 5000;
-    private Runnable _autoHideRunnable = new Runnable() {
+    private final Runnable _autoHideRunnable = new Runnable() {
         @Override
         public void run() {
             hide();
@@ -151,10 +142,10 @@ public class ClipboardPanel {
 
     // class fields
     private OnComputeInternalInsetsListener mInvocationHandler;
-    private Region mTouchableRegion = new Region();
+    private final Region mTouchableRegion = new Region();
 
     // Edge margin
-    private int _edgeMargin;
+    private final int _edgeMargin;
 
     // Menu display mode enum
     public enum MenuDisplayMode {
@@ -163,29 +154,18 @@ public class ClipboardPanel {
         ICON_AND_TEXT
     }
 
-    // ===============================================
-    // CONSTRUCTOR AND INITIALIZATION
-    // ===============================================
-
     public ClipboardPanel(EditView editView) {
         _editView = editView;
         _context = editView.getContext();
 
         // Initialize dimensions
         _menuItemHeight = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 48, _context.getResources().getDisplayMetrics());
-        _menuItemMinWidth = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 64, _context.getResources().getDisplayMetrics());
         _menuIconSize = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 24, _context.getResources().getDisplayMetrics());
         _edgeMargin = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 16, _context.getResources().getDisplayMetrics());
 
-        // Initialize all menu items configuration
         initializeAllMenuItems();
-
         initCustomPopup();
     }
-
-    // ===============================================
-    // MENU CONFIGURATION METHODS
-    // ===============================================
 
     /** Initialize all possible menu items with their configurations */
     private void initializeAllMenuItems() {
@@ -209,6 +189,7 @@ public class ClipboardPanel {
         String jsonConfig = prefs.getString("menu_order", null);
 
         // If not exists, save default config first
+        // IT CAN USE FOR RE SEQENCING THE MENU ITEMS
         if (jsonConfig == null) {
             jsonConfig = "[" +
                     "{\"id\":\"panel_btn_select\",\"title\":\"Select\",\"disabled\":false}," +
@@ -241,7 +222,6 @@ public class ClipboardPanel {
                 }
             }
         } catch (Exception e) {
-            Log.e("ClipboardPanel", "Error loading menu config: " + e.getMessage());
             // Fallback to default order
             setDefaultMenuOrder();
         }
@@ -250,8 +230,6 @@ public class ClipboardPanel {
         if (_menuItems.isEmpty()) {
             setDefaultMenuOrder();
         }
-
-        Log.d("ClipboardPanel", "Loaded " + _menuItems.size() + " menu items in order: " + _menuItems);
     }
 
     /** Set default menu order when no configuration is available */
@@ -270,10 +248,6 @@ public class ClipboardPanel {
         _menuItems.add("delete_btn");
     }
 
-    // ===============================================
-    // POPUP WINDOW INITIALIZATION
-    // ===============================================
-
     /** Initialize the custom popup window */
     private void initCustomPopup() {
         _popupContentHolder = new FrameLayout(_context);
@@ -287,6 +261,7 @@ public class ClipboardPanel {
         _customPopupWindow.setFocusable(false);
         _customPopupWindow.setElevation(24f);
         _customPopupWindow.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
+        _customPopupWindow.setAnimationStyle(android.R.style.Animation_Dialog);
 
         _contentContainer = new FrameLayout(_context);
 
@@ -299,17 +274,15 @@ public class ClipboardPanel {
                 0x33000000 // Semi-transparent black stroke
         );
 
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
-            // Enable proper clipping for rounded corners
-            _contentContainer.setClipToOutline(true);
-            _contentContainer.setOutlineProvider(new ViewOutlineProvider() {
-                @Override
-                public void getOutline(View view, Outline outline) {
-                    float radius = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 12, _context.getResources().getDisplayMetrics());
-                    outline.setRoundRect(0, 0, view.getWidth(), view.getHeight(), radius);
-                }
-            });
-        }
+        // Enable proper clipping for rounded corners
+        _contentContainer.setClipToOutline(true);
+        _contentContainer.setOutlineProvider(new ViewOutlineProvider() {
+            @Override
+            public void getOutline(View view, Outline outline) {
+                float radius = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 12, _context.getResources().getDisplayMetrics());
+                outline.setRoundRect(0, 0, view.getWidth(), view.getHeight(), radius);
+            }
+        });
 
         _contentContainer.setBackground(background);
         _popupContentHolder.addView(_contentContainer, new FrameLayout.LayoutParams(
@@ -321,10 +294,6 @@ public class ClipboardPanel {
         _divider.setBackgroundColor(0xFFDDDDDD);
         _customPopupWindow.setInputMethodMode(PopupWindow.INPUT_METHOD_NOT_NEEDED);
     }
-
-    // ===============================================
-    // TOUCH AND INSETS HANDLING
-    // ===============================================
 
     /** Configure touch handling for the popup */
     private void configTouch() {
@@ -342,14 +311,8 @@ public class ClipboardPanel {
         }
     }
 
-    // ===============================================
-    // MENU ITEM CREATION AND SETUP
-    // ===============================================
-
     /** Set up menu items based on configuration and display mode */
     private void setupMenuItems() {
-        Log.d("ClipboardPanel", "setupMenuItems called with mode: " + _menuDisplayMode);
-
         // Load menu configuration first
         loadMenuConfiguration();
 
@@ -465,16 +428,12 @@ public class ClipboardPanel {
         float density = _context.getResources().getDisplayMetrics().density;
         int screenWidth = _editView.getWidth();
 
-        Log.d("ClipboardPanel", "Screen width: " + screenWidth + "px, Density: " + density + ", Total items: " + allItems.size());
-
         ArrayList<MenuItemData> primaryItems = new ArrayList<>();
         ArrayList<MenuItemData> secondaryItems = new ArrayList<>();
 
         // If no overflow needed (all fit in primary), no expand button
         int maxPrimaryItems = calculateMaxPrimaryItems(screenWidth, density);
         boolean needsOverflow = allItems.size() > maxPrimaryItems;
-
-        Log.d("ClipboardPanel", "Max primary items possible: " + maxPrimaryItems + ", Needs overflow: " + needsOverflow);
 
         // Simple logic: always show first N items in primary, rest in secondary
         for (int i = 0; i < allItems.size(); i++) {
@@ -496,7 +455,6 @@ public class ClipboardPanel {
         if (_hasOverflow && !secondaryItems.isEmpty()) {
             addExpandButtonToPrimaryMenu();
             _overflowItems.addAll(secondaryItems);
-            Log.d("ClipboardPanel", "Added expand button with " + secondaryItems.size() + " overflow items");
 
             // Create secondary menu
             _secondaryMenu = new LinearLayout(_context);
@@ -532,16 +490,12 @@ public class ClipboardPanel {
 
         allItems.clear();
 
-        Log.d("ClipboardPanel", "Final distribution: " + primaryItems.size() + " primary, " +
-                secondaryItems.size() + " secondary, overflow: " + _hasOverflow);
     }
 
     /** Calculate maximum number of primary menu items that can fit on screen */
     private int calculateMaxPrimaryItems(int screenWidth, float density) {
         // Convert screen width to dp for consistent calculations
         int screenWidthDp = (int) (screenWidth / density);
-
-        Log.d("ClipboardPanel", "Screen width in dp: " + screenWidthDp);
 
         // Calculate item width based on display mode
         int itemWidthDp;
@@ -565,9 +519,6 @@ public class ClipboardPanel {
         // Available width (use 85% of screen width)
         int availableWidthDp = (int) (screenWidthDp * 0.85f);
 
-        // Calculate how many items we can fit
-        int maxItemsWithoutOverflow = availableWidthDp / itemWidthDp;
-
         // With overflow button, we need space for it
         int maxItemsWithOverflow = (availableWidthDp - expandButtonWidthDp) / itemWidthDp;
 
@@ -580,15 +531,10 @@ public class ClipboardPanel {
             maxItems = Math.min(5, maxItemsWithOverflow + 1); // Allow one more since icons are
             // compact
         }
-
         // For text-only mode, follow Android system behavior (usually 4 items)
         if (_menuDisplayMode == MenuDisplayMode.TEXT_ONLY) {
             maxItems = Math.min(4, maxItemsWithOverflow);
         }
-
-        Log.d("ClipboardPanel", "Item width: " + itemWidthDp + "dp, Available: " + availableWidthDp +
-                "dp, Max items: " + maxItems);
-
         return maxItems;
     }
 
@@ -617,12 +563,13 @@ public class ClipboardPanel {
             ((LinearLayout) expandButtonView).setGravity(Gravity.CENTER);
         }
 
-        // Set fixed height for expand button
+        // Set height for expand button - use WRAP_CONTENT with minHeight to prevent cropping
         ViewGroup.LayoutParams params = expandButtonView.getLayoutParams();
         if (params != null) {
-            params.height = _menuItemHeight;
+            params.height = ViewGroup.LayoutParams.WRAP_CONTENT;
+            expandButtonView.setMinimumHeight(_menuItemHeight);
             if (params instanceof LinearLayout.LayoutParams) {
-                ((LinearLayout.LayoutParams) params).width = _menuItemHeight; // Make it square
+                params.width = _menuItemHeight; // Make it square
             }
         }
 
@@ -659,12 +606,13 @@ public class ClipboardPanel {
             icon.setLayoutParams(new LinearLayout.LayoutParams(_menuIconSize, _menuIconSize));
         }
 
-        // Set fixed height for up button
+        // Set height for up button - use WRAP_CONTENT with minHeight to prevent cropping
         ViewGroup.LayoutParams params = _upButton.getLayoutParams();
         if (params != null) {
-            params.height = _menuItemHeight;
+            params.height = ViewGroup.LayoutParams.WRAP_CONTENT;
+            _upButton.setMinimumHeight(_menuItemHeight);
             if (params instanceof LinearLayout.LayoutParams) {
-                ((LinearLayout.LayoutParams) params).width = LinearLayout.LayoutParams.MATCH_PARENT;
+                params.width = LinearLayout.LayoutParams.MATCH_PARENT;
             }
         }
         _upButton.setLayoutParams(params);
@@ -703,10 +651,11 @@ public class ClipboardPanel {
         LayoutInflater inflater = LayoutInflater.from(layout.getContext());
         View menuItemView = inflater.inflate(R.layout.menu_item, layout, false);
 
-        // Set fixed height for menu items
+        // Set height for menu items - use WRAP_CONTENT with minHeight to prevent cropping
         ViewGroup.LayoutParams params = menuItemView.getLayoutParams();
         if (params != null) {
-            params.height = _menuItemHeight;
+            params.height = ViewGroup.LayoutParams.WRAP_CONTENT;
+            menuItemView.setMinimumHeight(_menuItemHeight);
         }
 
         ImageView icon = menuItemView.findViewById(R.id.menuIcon);
@@ -734,7 +683,7 @@ public class ClipboardPanel {
             // Vertical layout - full width
             LinearLayout.LayoutParams layoutParams = (LinearLayout.LayoutParams) menuItemView.getLayoutParams();
             layoutParams.width = LinearLayout.LayoutParams.MATCH_PARENT;
-            layoutParams.height = _menuItemHeight;
+            layoutParams.height = ViewGroup.LayoutParams.WRAP_CONTENT;
             menuItemView.setLayoutParams(layoutParams);
 
             // Center content vertically for vertical layout
@@ -765,7 +714,7 @@ public class ClipboardPanel {
             // Ensure minimum width
             int minWidth = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 56, _context.getResources().getDisplayMetrics());
             layoutParams.width = Math.max(itemWidth, minWidth);
-            layoutParams.height = _menuItemHeight;
+            layoutParams.height = ViewGroup.LayoutParams.WRAP_CONTENT;
             menuItemView.setLayoutParams(layoutParams);
 
             // Center content both vertically and horizontally for horizontal layout
@@ -777,12 +726,14 @@ public class ClipboardPanel {
         // Apply perfect rounded background based on position and menu type
         if (isVertical) {
             boolean isFirst = position == 0;
-            boolean isLast = isEdgeItem;
-            applyPerfectRoundedBackground(menuItemView, isFirst, isFirst, isLast, isLast);
+            applyPerfectRoundedBackground(menuItemView,
+                    isFirst,
+                    isFirst,
+                    isEdgeItem,
+                    isEdgeItem);
         } else {
             boolean isFirst = position == 0;
-            boolean isLast = isEdgeItem;
-            applyPerfectRoundedBackground(menuItemView, isFirst, false, isLast, false);
+            applyPerfectRoundedBackground(menuItemView, isFirst, false, isEdgeItem, false);
         }
 
         menuItemView.setOnClickListener(new View.OnClickListener() {
@@ -798,33 +749,24 @@ public class ClipboardPanel {
         layout.addView(menuItemView);
     }
 
-    // ===============================================
-    // DISPLAY MODE AND STYLING
-    // ===============================================
-
     /** Apply display mode to menu item (icon only, text only, or both) */
     private void applyDisplayMode(View menuItemView, MenuItemData menuItem, boolean isSecondaryMenu) {
         ImageView icon = menuItemView.findViewById(R.id.menuIcon);
         TextView titleView = menuItemView.findViewById(R.id.menuTitle);
-
-        Log.d("ClipboardPanel", "applyDisplayMode: " + _menuDisplayMode + " for " + menuItem.title + ", secondary: " + isSecondaryMenu);
 
         // Primary menu follows the selected display mode
         switch (_menuDisplayMode) {
             case TEXT_ONLY:
                 icon.setVisibility(View.GONE);
                 titleView.setVisibility(View.VISIBLE);
-                Log.d("ClipboardPanel", "TEXT_ONLY - hiding icon for: " + menuItem.title);
                 break;
             case ICON_ONLY:
                 icon.setVisibility(View.VISIBLE);
                 titleView.setVisibility(View.GONE);
-                Log.d("ClipboardPanel", "ICON_ONLY - hiding text for: " + menuItem.title);
                 break;
             case ICON_AND_TEXT:
                 icon.setVisibility(View.VISIBLE);
                 titleView.setVisibility(View.VISIBLE);
-                Log.d("ClipboardPanel", "ICON_AND_TEXT - showing both for: " + menuItem.title);
                 break;
         }
 
@@ -832,7 +774,6 @@ public class ClipboardPanel {
         if (isSecondaryMenu && _menuDisplayMode != MenuDisplayMode.TEXT_ONLY) {
             icon.setVisibility(View.VISIBLE);
             titleView.setVisibility(View.VISIBLE);
-            Log.d("ClipboardPanel", "Secondary menu - showing icon+text for: " + menuItem.title);
         }
 
         // Set the content
@@ -886,8 +827,10 @@ public class ClipboardPanel {
         }
 
         // Set padding to ensure content stays within bounds
-        int padding = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 16, _context.getResources().getDisplayMetrics());
-        view.setPadding(padding, padding, padding, padding);
+        // Reduced vertical padding to prevent cropping on devices with large font scaling
+        int hPadding = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 16, _context.getResources().getDisplayMetrics());
+        int vPadding = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 8, _context.getResources().getDisplayMetrics());
+        view.setPadding(hPadding, vPadding, hPadding, vPadding);
     }
 
     /** Get pressed state color */
@@ -908,62 +851,35 @@ public class ClipboardPanel {
         }
     }
 
-    // ===============================================
-    // PUBLIC API METHODS
-    // ===============================================
-
     /** Set menu display mode and force recreation if showing */
     public void setMenuDisplayMode(MenuDisplayMode mode) {
-        Log.d("ClipboardPanel", "SETTING MENU MODE: " + mode);
         _menuDisplayMode = mode;
 
         // If popup is showing, hide it so it recreates with new mode
         if (_customPopupWindow != null && _customPopupWindow.isShowing()) {
-            Log.d("ClipboardPanel", "Popup is showing, hiding to force recreation");
             hideCustomPopup();
         }
     }
 
-    public MenuDisplayMode getMenuDisplayMode() {
-        return _menuDisplayMode;
-    }
 
-    public void setTextOnlyMenu() {
-        setMenuDisplayMode(MenuDisplayMode.TEXT_ONLY);
-    }
-
-    public void setIconOnlyMenu() {
-        setMenuDisplayMode(MenuDisplayMode.ICON_ONLY);
-    }
-
-    public void setIconAndTextMenu() {
-        setMenuDisplayMode(MenuDisplayMode.ICON_AND_TEXT);
-    }
-
-    /** Force recreation of the popup */
-    public void forceRecreate() {
-        if (_customPopupWindow != null && _customPopupWindow.isShowing()) {
-            hideCustomPopup();
-        }
-    }
-
-    public Context getContext() {
-        return _context;
-    }
-
-    /** Show the clipboard panel */
-    public void show() {
-        showAtLocation(null);
+    public boolean isShowing() {
+        return _customPopupWindow != null && _customPopupWindow.isShowing();
     }
 
     /** Show the clipboard panel at specified location */
     public void showAtLocation(Rect preferredRect) {
-        showCustomPopup(preferredRect);
+        _preferredRect = preferredRect;
+        if (_customPopupWindow.isShowing()) {
+            updatePosition();
+        } else {
+            showCustomPopup(preferredRect);
+        }
         startAutoHideTimer();
     }
 
     /** Hide the clipboard panel */
     public void hide() {
+        _preferredRect = null;
         cancelAutoHideTimer();
         hideCustomPopup();
     }
@@ -983,10 +899,6 @@ public class ClipboardPanel {
             );
         }
     }
-
-    // ===============================================
-    // EXPANSION AND ANIMATION METHODS
-    // ===============================================
 
     /** Toggle between expanded and collapsed state */
     private void toggleExpand() {
@@ -1040,7 +952,8 @@ public class ClipboardPanel {
         heightAnimation.setDuration(180);
         heightAnimation.setStartOffset(60);
 
-        _openOverflowAnimation = new AnimationSet(true);
+        // Animation variables
+        AnimationSet _openOverflowAnimation = new AnimationSet(true);
         _openOverflowAnimation.addAnimation(widthAnimation);
         _openOverflowAnimation.addAnimation(heightAnimation);
         _openOverflowAnimation.setAnimationListener(new AnimationListener() {
@@ -1106,7 +1019,7 @@ public class ClipboardPanel {
         };
         heightAnimation.setDuration(210);
 
-        _closeOverflowAnimation = new AnimationSet(true);
+        AnimationSet _closeOverflowAnimation = new AnimationSet(true);
         _closeOverflowAnimation.addAnimation(widthAnimation);
         _closeOverflowAnimation.addAnimation(heightAnimation);
         _closeOverflowAnimation.setAnimationListener(new AnimationListener() {
@@ -1181,7 +1094,6 @@ public class ClipboardPanel {
                     Rect bounds = getContentBounds();
                     mTouchableRegion.op(bounds.left, bounds.top, bounds.right, bounds.bottom, Region.Op.UNION);
                     mInvocationHandler.setTouchRegion(mTouchableRegion);
-                    Log.d("ClipboardPanel", "Touch region updated: " + bounds.toString());
                 }
             });
         }
@@ -1199,8 +1111,6 @@ public class ClipboardPanel {
         if (_customPopupWindow.isShowing()) {
             return;
         }
-
-        Log.d("ClipboardPanel", "showCustomPopup with mode: " + _menuDisplayMode);
 
         setupMenuItems();
 
@@ -1253,45 +1163,59 @@ public class ClipboardPanel {
 
     /** Calculate optimal position for the popup */
     private void calculateOptimalPosition(Rect outRect, int width, int height) {
-        _caretRect = _editView.getBoundingBox(_editView.getCaretPosition());
-        _isSelectionMode = _editView.isSelectMode();
+        int[] viewLocation = new int[2];
+        _editView.getLocationInWindow(viewLocation);
 
-        if (_caretRect == null) {
-            outRect.set(_edgeMargin, _edgeMargin, _edgeMargin + width, _edgeMargin + height);
+        Rect targetRect = _preferredRect;
+
+        if (targetRect == null) {
+            int targetIndex;
+            if (_editView.isSelectMode()) {
+                targetIndex = (_editView.getSelectionStart() + _editView.getSelectionEnd()) / 2;
+            } else {
+                targetIndex = _editView.getCaretPosition();
+            }
+            targetRect = _editView.getBoundingBox(targetIndex);
+        }
+
+        if (targetRect == null) {
+            outRect.set(viewLocation[0] + _edgeMargin, viewLocation[1] + _edgeMargin,
+                    viewLocation[0] + _edgeMargin + width, viewLocation[1] + _edgeMargin + height);
             return;
         }
 
-        int caretX = _caretRect.left;
-        int caretY = _caretRect.top;
-        int lineHeight = _editView.getLineHeight();
-        int screenWidth = _editView.getWidth();
-        int screenHeight = _editView.getHeight();
+        int viewWidth = _editView.getWidth();
+        int viewHeight = _editView.getHeight();
 
-        int actionModeWidth = width;
-        int actionModeHeight = height;
+        // Center X on targeted area (targetRect is relative to EditView)
+        int optimalX = targetRect.centerX() - (width / 2);
+        // Clamp X to view bounds
+        optimalX = Math.max(_edgeMargin, Math.min(optimalX, viewWidth - width - _edgeMargin));
 
-        // Center X on caret, clamped
-        int optimalX = caretX + (_caretRect.width() / 2) - (actionModeWidth / 2);
-        optimalX = Math.max(_edgeMargin, Math.min(optimalX, screenWidth - actionModeWidth - _edgeMargin));
+        // Prefer showing ABOVE the targeted line
+        // We use a vertical offset to keep it clear of the cursor/selection
+        int verticalOffset = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 10, _context.getResources().getDisplayMetrics());
+        int optimalY = targetRect.top - height - verticalOffset;
 
-        // Prefer below cursor (downward), fallback above or bottom
-        int optimalY = caretY + lineHeight * 2; // Start below
-        if (optimalY + actionModeHeight > screenHeight - _edgeMargin) {
-            // Fallback to above if no space below
-            optimalY = caretY - actionModeHeight - lineHeight;
-            if (optimalY < _edgeMargin) {
-                // Final fallback to bottom
-                optimalY = screenHeight - actionModeHeight - _edgeMargin;
-            }
+        // If it goes off the top of the EditView, show BELOW the line
+        if (optimalY < _edgeMargin) {
+            // Increased offset to clear selection handles when showing below the line.
+            // Selection handles extend below the line, so we need extra space (approx 40dp) to keep them touchable.
+            int handleOffset = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 40, _context.getResources().getDisplayMetrics());
+            optimalY = targetRect.bottom + handleOffset;
         }
-        optimalY = Math.max(_edgeMargin, Math.min(optimalY, screenHeight - actionModeHeight - _edgeMargin));
 
-        outRect.set(optimalX, optimalY, optimalX + actionModeWidth, optimalY + actionModeHeight);
+        // Ensure it stays within vertical bounds of the EditView to avoid crossing toolbars
+        optimalY = Math.max(_edgeMargin, Math.min(optimalY, viewHeight - height - _edgeMargin));
+
+        // Set the output rectangle in window coordinates
+        outRect.set(
+                viewLocation[0] + optimalX,
+                viewLocation[1] + optimalY,
+                viewLocation[0] + optimalX + width,
+                viewLocation[1] + optimalY + height
+        );
     }
-
-    // ===============================================
-    // AUTO-HIDE TIMER METHODS
-    // ===============================================
 
     /** Start auto-hide timer */
     private void startAutoHideTimer() {
@@ -1309,10 +1233,6 @@ public class ClipboardPanel {
     private void cancelAutoHideTimer() {
         _autoHideHandler.removeCallbacks(_autoHideRunnable);
     }
-
-    // ===============================================
-    // MENU ACTION HANDLING
-    // ===============================================
 
     /** Handle menu item actions */
     private void handleCustomMenuAction(MenuAction action) {
@@ -1346,7 +1266,7 @@ public class ClipboardPanel {
                         shareIntent.setType("text/plain");
                         shareIntent.putExtra(Intent.EXTRA_TEXT, selectedText2);
                         _editView.getContext().startActivity(Intent.createChooser(shareIntent, "Share Text"));
-                    } catch (Exception e) {
+                    } catch (Exception ignored) {
                     }
                 }
                 break;
@@ -1362,10 +1282,6 @@ public class ClipboardPanel {
         hide();
         restartAutoHideTimer();
     }
-
-    // ===============================================
-    // UTILITY METHODS
-    // ===============================================
 
     /** Check if paste is available */
     private boolean canPaste() {
