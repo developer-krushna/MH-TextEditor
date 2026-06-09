@@ -1,20 +1,27 @@
-apply plugin: 'com.android.application'
+plugins {
+    id 'com.android.application'
+}
 
 android {
-    compileSdkVersion 33
-    buildToolsVersion "33.0.0"
+    namespace = "modder.hub.editor"
+    compileSdk = 33
 
     defaultConfig {
-        applicationId "modder.hub.editor"
-        minSdkVersion 24
-        targetSdkVersion 28
-        versionCode 1
-        versionName "1.0"
+        applicationId = "modder.hub.editor"
+        minSdk = 24
+        targetSdk = 33
+        versionCode = 1
+        versionName = "1.0"
     }
 
     buildTypes {
         release {
-            minifyEnabled false
+            minifyEnabled true
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+        debug {
+            minifyEnabled true
+            debuggable false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
@@ -22,5 +29,5 @@ android {
 
 dependencies {
     implementation fileTree(dir: "libs", include: ["*.jar"])
-	implementation project(':EditView')
+    implementation project(':EditView')
 }
