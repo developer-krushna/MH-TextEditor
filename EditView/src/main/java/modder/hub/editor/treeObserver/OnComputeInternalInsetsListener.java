@@ -43,6 +43,7 @@ import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 
+// helper class for accesing ViewTreeObserber class by using proxy loader
 /** Created by max on 2019/2/22.<br> */
 public class OnComputeInternalInsetsListener implements InvocationHandler {
 
@@ -58,10 +59,6 @@ public class OnComputeInternalInsetsListener implements InvocationHandler {
             e.printStackTrace();
         }
         return target;
-    }
-
-    public Region getTouchRegion() {
-        return touchRegion;
     }
 
     public void setTouchRegion(Region touchRegion) {
