@@ -41,7 +41,7 @@ import android.util.TypedValue;
 import android.app.Activity;
 import java.lang.reflect.Field;
 
-// Dont remember the actual author
+// I Don't remember the actual author
 
 public final class ScreenUtils {
 

@@ -45,5 +45,7 @@ public enum MenuAction {
     SHARE,
     GOTO,
     DELETE,
-    TRANSLATE
+    TRANSLATE,
+    TOGGLE_COMMENT,
+    OPEN_LINK
 }
