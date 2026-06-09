@@ -214,6 +214,7 @@ public class EditView extends View {
     private float mMagnifierX, mMagnifierY;
     private boolean mIsMagnifierShowing = false;
     private boolean mIsScaling = false;
+    private boolean mFollowCursor = false;
     private float mZoomScale = 1.0f;
     private float mZoomFocusX, mZoomFocusY;
     private boolean mIsDraggingFastScroller = false;
@@ -599,13 +600,6 @@ public class EditView extends View {
             removeCallbacks(blinkAction);
             mCursorVisible = true;
             postDelayed(blinkAction, BLINK_TIMEOUT);
-            // Ensure cursor is visible when gaining focus
-            post(new Runnable() {
-                @Override
-                public void run() {
-                    scrollToVisible();
-                }
-            });
         } else {
             removeCallbacks(blinkAction);
             mCursorVisible = false;
@@ -637,8 +631,10 @@ public class EditView extends View {
             if (isSelectMode) {
                 setSelection(getSelectionStart(), getSelectionEnd());
             }
-            // Ensure cursor is visible when layout changes (e.g. keyboard opens/resizes)
-            scrollToVisible();
+            if (mFollowCursor) {
+                scrollToVisible();
+                mFollowCursor = false;
+            }
         }
     }
 
@@ -1486,27 +1482,6 @@ public class EditView extends View {
         if (mMatchingBraceIndex != -1 && mMatchingBraceLine != -1) {
             drawSingleBraceHighlight(canvas, mMatchingBraceIndex, mMatchingBraceLine, visibleStartLine, visibleEndLine);
         }
-
-        // Draw continuous gutter background between braces
-        if (mShowLineNumbers && mCurrentBraceLine != -1 && mMatchingBraceLine != -1) {
-            int startLine = Math.min(mCurrentBraceLine, mMatchingBraceLine);
-            int endLine = Math.max(mCurrentBraceLine, mMatchingBraceLine);
-
-            int drawStartLine = Math.max(visibleStartLine, startLine);
-            int drawEndLine = Math.min(visibleEndLine, endLine);
-
-            if (drawStartLine <= drawEndLine) {
-                int gutterLeftPadding = ScreenUtils.dip2px(getContext(), 12);
-                int lineNumberWidth = getLineNumberWidth();
-                int gutterRightPadding = ScreenUtils.dip2px(getContext(), 6);
-                int gutterAreaWidth = gutterLeftPadding + lineNumberWidth + gutterRightPadding;
-                int gutterStartX = mStickyLineNumbers ? getScrollX() : 0;
-
-                Paint gutterPaint = new Paint(mBracePaint);
-                gutterPaint.setAlpha(26);
-                canvas.drawRect(gutterStartX, getLineTop(drawStartLine), gutterStartX + gutterAreaWidth, getLineBottom(drawEndLine), gutterPaint);
-            }
-        }
     }
 
     private void drawSingleBraceHighlight(Canvas canvas, int index, int line, int visibleStartLine, int visibleEndLine) {
@@ -1561,6 +1536,7 @@ public class EditView extends View {
             int startLine = Math.min(mCurrentBraceLine, mMatchingBraceLine);
             int endLine = Math.max(mCurrentBraceLine, mMatchingBraceLine);
 
+            // Re-use current visible lines to avoid extra work
             Rect clip = canvas.getClipBounds();
             int visibleStartLine = getLogicalLineFromY(clip.top);
             int visibleEndLine = getLogicalLineFromY(clip.bottom);
@@ -1577,14 +1553,14 @@ public class EditView extends View {
                 int separatorX = gutterStartX + gutterAreaWidth;
                 int separatorWidth = 3;
 
-                Paint separatorPaint = new Paint();
-                separatorPaint.setColor(Color.parseColor("#669797"));
-                separatorPaint.setStrokeWidth(separatorWidth);
+                // Draw only the colored separator line highlight
+                mPaint.setColor(Color.parseColor("#669797"));
+                mPaint.setStrokeWidth(separatorWidth);
 
                 float startY = getLineTop(drawStartLine);
                 float endY = getLineBottom(drawEndLine);
 
-                canvas.drawLine(separatorX, startY, separatorX, endY, separatorPaint);
+                canvas.drawLine(separatorX, startY, separatorX, endY, mPaint);
             }
         }
     }
@@ -2753,6 +2729,7 @@ public class EditView extends View {
     protected void onScrollChanged(int l, int t, int oldl, int oldt) {
         super.onScrollChanged(l, t, oldl, oldt);
         mLastScrollTimeFast = System.currentTimeMillis();
+        mFollowCursor = false;
 
         // Refresh search highlights for the newly visible area
         if (mLastSearchPattern != null && !mLastSearchPattern.isEmpty()) {
@@ -2874,6 +2851,7 @@ public class EditView extends View {
     }
 
     private void moveCursor(int direction, boolean extendSelection) {
+        mFollowCursor = true;
         int oldCursor = mCursorIndex;
         int newCursor = oldCursor;
         int len = mGapBuffer.length();
@@ -3332,14 +3310,7 @@ public class EditView extends View {
         }
 
         // Update matching brace - ASYNCHRONOUSLY
-        mBraceSearchId++;
-        mMatchingBraceIndex = -1;
-        mCurrentBraceIndex = -1;
-        mMatchingBraceLine = -1;
-        mCurrentBraceLine = -1;
-        mPendingBraceCheckIdx = -1;
-        mBraceThreadHandler.removeCallbacks(mBraceSearchRunnable);
-
+        // Only trigger search if we are not in select mode
         if (!isSelectMode && mGapBuffer.length() > 0) {
             int checkIdx = -1;
             if (mCursorIndex < mGapBuffer.length()) {
@@ -3354,10 +3325,33 @@ public class EditView extends View {
             }
 
             if (checkIdx != -1) {
-                mPendingBraceCheckIdx = checkIdx;
-                // Delay slightly to wait for rapid cursor movement to stop
-                mBraceThreadHandler.postDelayed(mBraceSearchRunnable, 50);
+                // If the brace under cursor changed, then schedule a new search
+                if (checkIdx != mPendingBraceCheckIdx) {
+                    mPendingBraceCheckIdx = checkIdx;
+                    mBraceSearchId++;
+                    mBraceThreadHandler.removeCallbacks(mBraceSearchRunnable);
+                    // Short delay to avoid flickering while moving cursor rapidly
+                    mBraceThreadHandler.postDelayed(mBraceSearchRunnable, 30);
+                }
+            } else {
+                // Not on a brace - clear everything immediately
+                mPendingBraceCheckIdx = -1;
+                mBraceSearchId++;
+                mMatchingBraceIndex = -1;
+                mCurrentBraceIndex = -1;
+                mMatchingBraceLine = -1;
+                mCurrentBraceLine = -1;
+                mBraceThreadHandler.removeCallbacks(mBraceSearchRunnable);
             }
+        } else {
+            // In selection mode or empty buffer - clear
+            mPendingBraceCheckIdx = -1;
+            mBraceSearchId++;
+            mMatchingBraceIndex = -1;
+            mCurrentBraceIndex = -1;
+            mMatchingBraceLine = -1;
+            mCurrentBraceLine = -1;
+            mBraceThreadHandler.removeCallbacks(mBraceSearchRunnable);
         }
 
         if (mClipboardPanel != null) {
@@ -3818,6 +3812,7 @@ public class EditView extends View {
             mGapBuffer.endBatchEdit();
         }
 
+        mFollowCursor = true;
         scrollToVisible();
     }
 
@@ -5693,6 +5688,7 @@ public class EditView extends View {
                 clearLineSelection();
                 postInvalidate();
                 // Ensure the tapped position is visible
+                mFollowCursor = true;
                 scrollToVisible();
                 mLastTapTime = System.currentTimeMillis();
                 postDelayed(blinkAction, BLINK_TIMEOUT);
