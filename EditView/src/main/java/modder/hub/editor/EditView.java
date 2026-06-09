@@ -1,45 +1,44 @@
 /*
-* MH-TextEditor - An Advanced and optimized TextEditor for android
-* Copyright 2025, developer-krushna
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following conditions are
-* met:
-*
-*     * Redistributions of source code must retain the above copyright
-* notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above
-* copyright notice, this list of conditions and the following disclaimer
-* in the documentation and/or other materials provided with the
-* distribution.
-*     * Neither the name of developer-krushna nor the names of its
-* contributors may be used to endorse or promote products derived from
-* this software without specific prior written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-* A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-* OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-* SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-* LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-* DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-* THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-* (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-* OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * MH-TextEditor - An Advanced and optimized TextEditor for android
+ * Copyright 2025-26, developer-krushna
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are
+ * met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ * notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above
+ * copyright notice, this list of conditions and the following disclaimer
+ * in the documentation and/or other materials provided with the
+ * distribution.
+ *     * Neither the name of developer-krushna nor the names of its
+ * contributors may be used to endorse or promote products derived from
+ * this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
-*     Please contact Krushna by email modder-hub@zohomail.in if you need
-*     additional information or have any questions
-*/
-
+ *     Please contact Krushna by email mt.modder.hub@gmail.com if you need
+ *     additional information or have any questions
+ */
 package modder.hub.editor;
 
+import android.annotation.SuppressLint;
 import android.content.ClipData;
 import android.content.ClipDescription;
 import android.content.ClipboardManager;
 import android.content.Context;
-import android.content.Intent;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
@@ -47,11 +46,13 @@ import android.graphics.Rect;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
 import android.os.Handler;
+import android.text.Editable;
 import android.text.InputType;
+import android.text.Selection;
 import android.text.SpannableString;
 import android.text.Spanned;
 import android.text.TextPaint;
-import android.text.TextUtils;
+import android.text.TextWatcher;
 import android.text.style.ForegroundColorSpan;
 import android.util.AttributeSet;
 import android.util.Log;
@@ -74,236 +75,317 @@ import android.widget.ListPopupWindow;
 import android.widget.OverScroller;
 import android.widget.PopupWindow;
 import android.widget.TextView;
+
+import androidx.annotation.NonNull;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import modder.hub.editor.R;
+
 import modder.hub.editor.buffer.GapBuffer;
 import modder.hub.editor.component.ClipboardPanel;
 import modder.hub.editor.component.Magnifier;
+import modder.hub.editor.highlight.LineResult;
 import modder.hub.editor.highlight.MHSyntaxHighlightEngine;
+import modder.hub.editor.lib.R;
 import modder.hub.editor.listener.OnTextChangedListener;
+import modder.hub.editor.utils.LineHeightManager;
 import modder.hub.editor.utils.ScreenUtils;
 
 /* Author : Krushna Chandra Maharna(@developer-krushna)
-   This project was actually started by some one using gap buffer
-   But i forgot his name and his repository link because i was started
-   working on this project in 2024 .. During that time due to some personal problem
+   This project was actually started by someone using gap buffer
+   But i forgot his name and his repository link because I was started
+   working on this project in 2024 . During that time due to some personal problem
    I closed this project and saved it in sdcard for future task .
    But unfortunately i unable to save the original author name. I am really sorry.
    But if you are the creator then please let me know so that i can update this
    part. Thank You
 
-   Optmization , code refactorinh and comments are made by ChatGPT
-*/
-
-/*
-* I have not included many useful helper methods as i was working for something
-* Feel free to include them
-* But basic fetures are already introduced so no need to worry about it Lol
-
+   Optimization , code refactoring and comments are made by AI
+   @Radhe Radhe
 */
 
 public class EditView extends View {
 
+    // --- Constants ---
     private static final String COPYRIGHT = "MH-TextEditor\nCopyright (C) Krushna Chandra modder-hub@zohomail.in\nThis project is distributed under the LGPL v2.1 license";
-
+    private static final int FAST_SCROLLER_HIDE_DELAY = 1500;
+    private static final int FAST_SCROLLER_MIN_THUMB_LENGTH_DP = 64;
+    private static final int FAST_SCROLLER_THUMB_THICKNESS_DP = 8;
+    private static final int AUTO_COMPLETE_DELAY = 100;
     private final String TAG = this.getClass().getSimpleName();
-
-    // ---------- Fields (state, resources, helpers) ----------
-    private Paint mPaint;
-    private TextPaint mTextPaint;
+    private final int DEFAULT_DURATION = 250;
+    private final int BLINK_TIMEOUT = 500;
+    private final LineHeightManager mHeightManager = new LineHeightManager();
+    private final Map<String, Integer> mWordFrequencyMap = new ConcurrentHashMap<String, Integer>();
+    // --- Handlers ---
+    private final Handler mSelectionHandler = new Handler();
+    private final Handler mSearchHandler = new Handler();
+    private final Handler mBraceThreadHandler = new Handler();
+    private final boolean isSyntaxDarkMode = false;
+    // --- Navigation & History ---
+    private final List<Integer> mCursorHistory = new ArrayList<>();
+    // --- Core Data & Engines ---
     private GapBuffer mGapBuffer;
-
-    // cursor and select handle drawable resources
-    private Drawable mDrawableCursorRes;
-    private Drawable mTextSelectHandleLeftRes;
-    private Drawable mTextSelectHandleRightRes;
-    private Drawable mTextSelectHandleMiddleRes;
-
-    private int mCursorPosX, mCursorPosY;
+    private MHSyntaxHighlightEngine mHighlighter;
+    // --- Editor Configuration & State ---
+    private int mTabSize = 4;
+    private boolean mAutoIndentEnabled = true;
+    private boolean mShowLineNumbers = true;
+    private boolean mShowWrapArrows = true;
+    private boolean mStickyLineNumbers = true;
+    private boolean mShowIndentGuides = true;
+    private boolean mWordWrap = false;
+    private boolean isEditedMode = true;
+    private boolean mAutoCompleteEnabled = true;
+    private boolean mMagnifierEnabled = true;
+    // --- Cursor State ---
     private int mCursorLine, mCursorIndex;
-    private int mCursorWidth, mCursorHeight;
-    private int screenWidth, screenHeight;
-    private int lineWidth, spaceWidth;
-    private int handleMiddleWidth, handleMiddleHeight;
-    private int selectionStart, selectionEnd;
-    private int selectHandleWidth, selectHandleHeight;
+    private int mCursorPosX, mCursorPosY;
+    private int mCursorYOffsetWithinLine;
+    private int mCursorWidth;
+    private boolean mCursorVisible = true;
+    private int[] mCursorWordBounds = null;
+    // --- Selection State ---
+    private boolean isSelectMode = false;
+    private boolean mHandleMiddleVisible = false;
+    private boolean mHideSelectHandles = false;
     private int selectHandleLeftX, selectHandleLeftY;
     private int selectHandleRightX, selectHandleRightY;
-
-    private int mMetaState = 0;
-
-    private OnTextChangedListener mTextListener;
-    private OverScroller mScroller;
-    private GestureDetector mGestureDetector;
-    private GestureListener mGestureListener;
-    private ScaleGestureDetector mScaleGestureDetector;
-    private ClipboardManager mClipboard;
-    private ArrayList<Pair<Integer, Integer>> mReplaceList;
-
-    private boolean mCursorVisiable = true;
-    private boolean mHandleMiddleVisable = false;
-    private boolean isEditedMode = true;
-    private boolean isSelectMode = false;
-
-    private long mLastScroll;
-    // record last single tap time
-    private long mLastTapTime;
-    // left margin for draw text
-    private final int SPACEING = 2;
-    // animation duration 250ms
-    private final int DEFAULT_DURATION = 250;
-    // cursor blink BLINK_TIMEOUT 500ms
-    private final int BLINK_TIMEOUT = 500;
-
-    // Magnifier
-    private Magnifier mMagnifier;
-    private boolean mMagnifierEnabled = true;
-    private float mMagnifierX, mMagnifierY;
-    private boolean mIsMagnifierShowing = false;
-
-    private ClipboardPanel mClipboardPanel;
-
-    private MHSyntaxHighlightEngine mHighlighter;
-    private boolean isSyntaxDarkMode = false;
-
-    // Auto-complete
-    private Set<String> mWordSet = new HashSet<>();
-    private ListPopupWindow mAutoCompletePopup;
-    private ArrayAdapter<String> mAutoCompleteAdapter;
-
-    private static final Pattern WORD_PATTERN = Pattern.compile("\\w+");
-    private static final int MIN_WORD_LEN = 2; // Filter short words
-    private static final int WORD_UPDATE_DELAY = 200; // ms throttle
-    private Runnable mWordUpdateRunnable = new Runnable() {
-        @Override
-        public void run() {
-            updateWordSet();
-        }
-    };
-    private String mCurrentPrefix = "";
-    private long mLastInputTime = 0;
-    private String mLastCommittedText = "";
-    private boolean mProcessingInput = false;
-    private final long INPUT_DEBOUNCE_DELAY = 50; // ms
-
-    private boolean mAutoIndentEnabled = true; // Default on
-
-    private int mFirstSelectedLine = -1;
-    private int mSecondSelectedLine = -1;
-    private boolean mWaitingForSecondSelection = false;
+    private int mPendingDeleteStart = -1;
+    private int mPendingDeleteEnd = -1;
     private int mStartSelectionLine = -1;
     private int mEndSelectionLine = -1;
     private boolean mIsLineSelectionMode = false;
-    private Runnable mClearSelectionRunnable = new Runnable() {
+    private int mFirstSelectedLine = -1;
+    private int mSecondSelectedLine = -1;
+    private boolean mWaitingForSecondSelection = false;
+    private final Runnable mClearSelectionRunnable = new Runnable() {
         @Override
         public void run() {
-            // If user doesn't select second line within timeout, clear selection
             mWaitingForSecondSelection = false;
             mFirstSelectedLine = -1;
         }
     };
-
-    // ---------- Blink / auto-hide ----------
-    // cursor blink runnable toggling visibility
-    private Runnable blinkAction = new Runnable() {
+    // --- Composing Text State ---
+    private int mComposingStart = -1;
+    private int mComposingEnd = -1;
+    private int mHistoryIndex = -1;
+    private boolean mIsNavigatingHistory = false;
+    private int mLastHistoryLine = -1;
+    // --- Painting & Graphics ---
+    private Paint mPaint;
+    private Paint mBracePaint;
+    private Paint mGuidelinePaint;
+    private TextPaint mTextPaint;
+    private Paint mFastScrollerPaint;
+    // --- Drawables & Resources ---
+    private Drawable mDrawableCursorRes;
+    private Drawable mTextSelectHandleLeftRes;
+    private Drawable mTextSelectHandleRightRes;
+    private Drawable mTextSelectHandleMiddleRes;
+    private Drawable mLeftSoftWrap, mRightSoftWrap;
+    // --- Layout & Dimensions ---
+    private int lineWidth, spaceWidth;
+    private int handleMiddleWidth, handleMiddleHeight;
+    private int selectHandleWidth, selectHandleHeight;
+    private int mTotalHeight = 0;
+    private int[] mLineTops;
+    private int mOldWrapWidth = -1;
+    private volatile boolean mIsCalculatingMaxWidth = false;
+    // --- Interaction & Scroll State ---
+    private OverScroller mScroller;
+    private GestureDetector mGestureDetector;
+    private GestureListener mGestureListener;
+    private ScaleGestureDetector mScaleGestureDetector;
+    private long mLastScroll;
+    private long mLastTapTime;
+    private float mAutoScrollFactor = 0f;
+    private float mLastTouchX, mLastTouchY;
+    // --- Feature States ---
+    private Magnifier mMagnifier;
+    private float mMagnifierX, mMagnifierY;
+    private boolean mIsMagnifierShowing = false;
+    private boolean mIsScaling = false;
+    private float mZoomScale = 1.0f;
+    private float mZoomFocusX, mZoomFocusY;
+    private boolean mIsDraggingFastScroller = false;
+    private boolean mIsDraggingFastScrollerHorizontally = false;
+    private float mFastScrollerAlpha = 0;
+    private long mLastScrollTimeFast = 0;
+    private float mFastScrollerTouchOffset = 0;
+    private ArrayList<Pair<Integer, Integer>> mReplaceList = new ArrayList<>();
+    private String mLastSearchPattern = "";
+    // --- Internal Runnables & Listeners ---
+    private final Runnable mSearchRunnable = new Runnable() {
         @Override
         public void run() {
-            // TODO: Implement this method
-            mCursorVisiable = !mCursorVisiable;
-            postDelayed(blinkAction, BLINK_TIMEOUT);
-
-            if (System.currentTimeMillis() - mLastTapTime >= 5 * BLINK_TIMEOUT) {
-                mHandleMiddleVisable = false;
+            if (!mLastSearchPattern.isEmpty()) {
+                find(mLastSearchPattern);
             }
-            postInvalidate();
         }
     };
-
-    private Handler mSelectionHandler = new Handler();
-    private Runnable mUpdateSelectionPosition = new Runnable() {
+    private int mMatchingBraceIndex = -1;
+    private int mCurrentBraceIndex = -1;
+    private int mMatchingBraceLine = -1;
+    private int mCurrentBraceLine = -1;
+    private long mBraceSearchId = 0;
+    private int mPendingBraceCheckIdx = -1;
+    private final Runnable mBraceSearchRunnable = new Runnable() {
         @Override
         public void run() {
-            if (mClipboardPanel != null && (isSelectMode || mHandleMiddleVisable)) {
+            final int checkIdx = mPendingBraceCheckIdx;
+            final long searchId = mBraceSearchId;
+
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    final int matchIdx = findMatchingBrace(checkIdx);
+
+                    // Pre-calculate line numbers in background to save UI thread time
+                    final int currentLine = (matchIdx != -1) ? getOffsetLine(checkIdx) : -1;
+                    final int matchLine = (matchIdx != -1) ? getOffsetLine(matchIdx) : -1;
+
+                    post(new Runnable() {
+                        @Override
+                        public void run() {
+                            if (searchId == mBraceSearchId) {
+                                mCurrentBraceIndex = (matchIdx != -1) ? checkIdx : -1;
+                                mMatchingBraceIndex = matchIdx;
+                                mCurrentBraceLine = currentLine;
+                                mMatchingBraceLine = matchLine;
+                                postInvalidate();
+                            }
+                        }
+                    });
+                }
+            }).start();
+        }
+    };
+    private Set<String> mWordSet = new HashSet<>();
+    private ListPopupWindow mAutoCompletePopup;
+    private ArrayAdapter<String> mAutoCompleteAdapter;
+    private String mCurrentPrefix = "";
+    // --- Components ---
+    private ClipboardPanel mClipboardPanel;
+    private final Runnable mUpdateSelectionPosition = new Runnable() {
+        @Override
+        public void run() {
+            if (mClipboardPanel != null && (isSelectMode || mHandleMiddleVisible)) {
                 mClipboardPanel.updatePosition();
             }
         }
     };
-
-    private Runnable mAutoHideRunnable = new Runnable() {
+    private ClipboardManager mClipboard;
+    // --- Listeners ---
+    private OnTextChangedListener mTextListener;    private final Runnable mAutoCompleteRunnable = new Runnable() {
         @Override
         public void run() {
-            if (!isSelectMode && !mHandleMiddleVisable) {
-                hideTextSelectionWindow();
+            String prefix = getCurrentPrefix();
+            if (prefix.isEmpty()) {
+                dismissAutoComplete();
+                return;
             }
+            // Only re-filter if prefix actually changed
+            if (!prefix.equals(mCurrentPrefix)) {
+                mCurrentPrefix = prefix;
+                mAutoCompleteAdapter.setNotifyOnChange(false);
+                mAutoCompleteAdapter.clear();
+                mAutoCompleteAdapter.notifyDataSetChanged();
+            }
+            filterAndShowSuggestions(prefix);
         }
     };
+    private OnSelectionChangeListener mSelectionListener;
 
-    // ---------- Constructors ----------
-    // Constructor (Context)
     public EditView(Context context) {
         super(context);
         initView(context);
     }
 
-    // Constructor (Context, AttributeSet)
     public EditView(Context context, AttributeSet attrs) {
         super(context, attrs);
         initView(context);
-    }
+    }    //Cursor blinking
+    private final Runnable blinkAction = new Runnable() {
+        @Override
+        public void run() {
+            if (isSelectMode) {
+                mCursorVisible = false;
+                return;
+            }
+            mCursorVisible = !mCursorVisible;
+            removeCallbacks(blinkAction);
+            postDelayed(blinkAction, BLINK_TIMEOUT);
+            postInvalidate();
+        }
+    };
 
-    // Constructor (Context, AttributeSet, defStyle)
     public EditView(Context context, AttributeSet attrs, int defStyle) {
         super(context, attrs, defStyle);
         initView(context);
-    }
+    }    private final Runnable mAutoHideRunnable = new Runnable() {
+        @Override
+        public void run() {
+            mHideSelectHandles = true;
+            mHandleMiddleVisible = false;
+            hideTextSelectionWindow();
+            postInvalidate();
+        }
+    };
 
+    // Initialize all editor components, drawables, and settings
     private void initView(Context context) {
         Log.v(TAG, COPYRIGHT);
 
-        // Initialize Gapbuffer
         mGapBuffer = new GapBuffer();
+        mGapBuffer.addTextChangedListener(mInternalWatcher);
         mCursorLine = getLineCount();
         setBackgroundColor(Color.WHITE);
 
-        screenWidth = ScreenUtils.getScreenWidth(context);
-        screenHeight = ScreenUtils.getScreenHeight(context);
+        mTextPaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
+        mTextPaint.setTypeface(Typeface.MONOSPACE);
+        mTextPaint.setColor(Color.parseColor("#B0B0B0"));
+
+        // Initialize highlighter with no language to provide basic layout support
+        mHighlighter = new MHSyntaxHighlightEngine(context, mTextPaint, null, isSyntaxDarkMode);
+        mHighlighter.setLineProvider(new MHSyntaxHighlightEngine.LineProvider() {
+            @Override
+            public String getLine(int index) {
+                return EditView.this.getLine(index);
+            }
+        });
 
         mDrawableCursorRes = context.getDrawable(R.drawable.abc_text_cursor_material);
-        mDrawableCursorRes.setTint(Color.BLACK);
-
-        mCursorWidth = mDrawableCursorRes.getIntrinsicWidth();
-        mCursorHeight = mDrawableCursorRes.getIntrinsicHeight();
+        if (mDrawableCursorRes != null) {
+            mDrawableCursorRes.setTint(Color.BLACK);
+            mCursorWidth = mDrawableCursorRes.getIntrinsicWidth();
+        }
 
         mClipboardPanel = new ClipboardPanel(this);
 
-        // Initialize magnifier
         mMagnifier = new Magnifier(this);
 
-        // Reduce cursor width and make it responsive
         int density = (int) getResources().getDisplayMetrics().density;
-        mCursorWidth = Math.max(2, density); // Minimum 2px, scales with density
-        if (mCursorWidth > 5) mCursorWidth = 5; // Max 4px
+        mCursorWidth = Math.max(2, (int) (density * 1.5f));
+        if (mCursorWidth > 10) mCursorWidth = 10;
 
-        // handle left - scale down selection handles
         mTextSelectHandleLeftRes = context.getDrawable(R.drawable.abc_text_select_handle_left_mtrl);
         mTextSelectHandleLeftRes.setTint(Color.parseColor("#63B5F7"));
 
-        // Scale down selection handles based on screen density
         selectHandleWidth = (int) (mTextSelectHandleLeftRes.getIntrinsicWidth() * 0.3f);
         selectHandleHeight = (int) (mTextSelectHandleLeftRes.getIntrinsicHeight() * 0.3f);
 
-        // handle right
         mTextSelectHandleRightRes = context.getDrawable(R.drawable.abc_text_select_handle_right_mtrl);
         mTextSelectHandleRightRes.setTint(Color.parseColor("#63B5F7"));
 
-        // handle middle - scale down
         mTextSelectHandleMiddleRes = context.getDrawable(R.drawable.abc_text_select_handle_middle_mtrl);
         mTextSelectHandleMiddleRes.setTint(Color.parseColor("#63B5F7"));
         handleMiddleWidth = (int) (mTextSelectHandleMiddleRes.getIntrinsicWidth() * 0.5f);
@@ -313,8 +395,12 @@ public class EditView extends View {
         mGestureDetector = new GestureDetector(context, mGestureListener);
         mScaleGestureDetector = new ScaleGestureDetector(context, new ScaleGestureListener());
 
-        mTextPaint = new TextPaint(Paint.ANTI_ALIAS_FLAG);
-        mTextPaint.setColor(Color.parseColor("#B0B0B0"));
+        mBracePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        mBracePaint.setColor(Color.parseColor("#B3DBFB"));
+
+        mGuidelinePaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        mGuidelinePaint.setColor(Color.parseColor("#E0E0E0"));
+        mGuidelinePaint.setStrokeWidth(1.0f);
 
         setTextSize(ScreenUtils.dip2px(context, 18));
         mPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
@@ -325,22 +411,52 @@ public class EditView extends View {
         mClipboard = (ClipboardManager) context.getSystemService(Context.CLIPBOARD_SERVICE);
         mReplaceList = new ArrayList<>();
 
-        spaceWidth = (int) mTextPaint.measureText("  ");
+        mFastScrollerPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+        mFastScrollerPaint.setTextSize(ScreenUtils.dip2px(context, 12));
+        mFastScrollerPaint.setTypeface(Typeface.MONOSPACE);
 
-        // Explicitly set initial scroll position to (0, 0)
+        mLeftSoftWrap = context.getDrawable(R.drawable.ic_left_soft_wrap);
+        mRightSoftWrap = context.getDrawable(R.drawable.ic_right_soft_wrap);
+
+        spaceWidth = (int) mTextPaint.measureText(" ");
+
         scrollTo(0, 0);
-
-        requestFocus();
+        setTabSize(4);
         setFocusable(true);
         setFocusableInTouchMode(true);
         postDelayed(blinkAction, BLINK_TIMEOUT);
+        initializeAutocompleteView(context);
+        updateLineWidth();
+    }    private final TextWatcher mInternalWatcher = new TextWatcher() {
+        @Override
+        public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+        }
 
+        @Override
+        public void onTextChanged(CharSequence s, int start, int before, int count) {
+            if (mGapBuffer != null && mGapBuffer.isBatchEdit()) return;
+            int line = getOffsetLine(start);
+            // If the change span is large, refresh everything
+            if (count > 100 || before > 100) {
+                EditView.this.onTextChanged();
+            } else {
+                EditView.this.onTextChanged(line);
+            }
+        }
+
+        @Override
+        public void afterTextChanged(Editable s) {
+            postInvalidate();
+        }
+    };
+
+    private void initializeAutocompleteView(Context context) {
         mAutoCompletePopup = new ListPopupWindow(getContext());
         mAutoCompleteAdapter = new ArrayAdapter<String>(
-        getContext(),
-        R.layout.item_autocomplete,
-        R.id.text1, // 👈 explicitly tell it which TextView to use
-        new ArrayList<String>()
+                getContext(),
+                R.layout.item_autocomplete,
+                R.id.text1,
+                new ArrayList<String>()
         ) {
             @Override
             public View getView(int position, View convertView, ViewGroup parent) {
@@ -364,9 +480,14 @@ public class EditView extends View {
             }
         };
         mAutoCompletePopup.setAdapter(mAutoCompleteAdapter);
-        mAutoCompletePopup.setHeight(ScreenUtils.dip2px(context, 150)); // fits about 3-4 rows
-        mAutoCompletePopup.setModal(false); // allow typing while shown
+        mAutoCompletePopup.setHeight(ScreenUtils.dip2px(context, 150));
+        mAutoCompletePopup.setModal(false);
         mAutoCompletePopup.setAnchorView(this);
+        mAutoCompletePopup.setModal(false);
+        mAutoCompletePopup.setAnimationStyle(0);
+        mAutoCompletePopup.setBackgroundDrawable(
+                getResources().getDrawable(android.R.drawable.dialog_holo_light_frame)
+        );
 
         mAutoCompletePopup.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override
@@ -381,175 +502,623 @@ public class EditView extends View {
         mAutoCompletePopup.setOnDismissListener(new PopupWindow.OnDismissListener() {
             @Override
             public void onDismiss() {
-                mCurrentPrefix = ""; // Reset on dismiss
+                mCurrentPrefix = "";
             }
         });
-        // Initial word set
-        post(mWordUpdateRunnable);
     }
 
-    // ---------- Lifecycle ----------
-    // Called when view detached from window
+    // Initial scan of all words in document
+    private void initialWordScan() {
+        if (mGapBuffer == null) return;
+        final GapBuffer bufferAtStart = mGapBuffer;
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                mWordFrequencyMap.clear();
+                Pattern pattern = Pattern.compile("[a-zA-Z0-9_]{2,}");
+                for (int i = 1; ; i++) {
+                    // Stop if buffer was swapped or we reached the end
+                    if (mGapBuffer != bufferAtStart) return;
+                    if (i > getLineCount()) break;
+
+                    String line;
+                    try {
+                        line = getLine(i);
+                    } catch (Exception e) {
+                        // Buffer was likely modified during scan, so break it.
+                        break;
+                    }
+
+                    if (line != null) {
+                        Matcher matcher = pattern.matcher(line);
+                        while (matcher.find()) {
+                            String word = matcher.group();
+                            Integer count = mWordFrequencyMap.get(word);
+                            if (count == null) {
+                                mWordFrequencyMap.put(word, 1);
+                            } else {
+                                mWordFrequencyMap.put(word, count + 1);
+                            }
+                        }
+                    }
+                    if (i % 2000 == 0) {
+                        try {
+                            Thread.sleep(1);
+                        } catch (InterruptedException ignored) {
+                        }
+                    }
+                }
+            }
+        }).start();
+    }
+
+    //Add words from text to frequency map for autocomplete
+    private void addWordsToMap(String text) {
+        if (text == null || text.isEmpty()) return;
+        Matcher matcher = Pattern.compile("[a-zA-Z0-9_]{2,}").matcher(text);
+        while (matcher.find()) {
+            String word = matcher.group();
+            Integer count = mWordFrequencyMap.get(word);
+            if (count == null) {
+                mWordFrequencyMap.put(word, 1);
+            } else {
+                mWordFrequencyMap.put(word, count + 1);
+            }
+        }
+    }
+
+    // Remove words from frequency map
+    private void removeWordsFromMap(String text) {
+        if (text == null || text.isEmpty()) return;
+        Matcher matcher = Pattern.compile("[a-zA-Z0-9_]{2,}").matcher(text);
+        while (matcher.find()) {
+            String word = matcher.group();
+            Integer count = mWordFrequencyMap.get(word);
+            if (count != null) {
+                if (count > 1) {
+                    mWordFrequencyMap.put(word, count - 1);
+                } else {
+                    mWordFrequencyMap.remove(word);
+                }
+            }
+        }
+    }
+
+    // Clean up when view detached
     @Override
     protected void onDetachedFromWindow() {
-        removeCallbacks(mWordUpdateRunnable);
+        removeCallbacks(blinkAction);
         dismissAutoComplete();
         super.onDetachedFromWindow();
     }
 
-    // Called when view size/layout changes
     @Override
-    protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
+    protected void onFocusChanged(boolean gainFocus, int direction, Rect previouslyFocusedRect) {
+        super.onFocusChanged(gainFocus, direction, previouslyFocusedRect);
+        if (gainFocus) {
+            removeCallbacks(blinkAction);
+            mCursorVisible = true;
+            postDelayed(blinkAction, BLINK_TIMEOUT);
+            // Ensure cursor is visible when gaining focus
+            post(new Runnable() {
+                @Override
+                public void run() {
+                    scrollToVisible();
+                }
+            });
+        } else {
+            removeCallbacks(blinkAction);
+            mCursorVisible = false;
+            dismissAutoComplete();
+        }
+        postInvalidate();
+    }
+
+    //Handle layout changes and wrap width updates
+    @Override
+    public void onLayout(boolean changed, int left, int top, int right, int bottom) {
         super.onLayout(changed, left, top, right, bottom);
         if (changed) {
-            // Only adjust scroll if cursor is significantly out of view
+            int newWrapWidth = getWrapWidth();
+            boolean widthChanged = newWrapWidth != mOldWrapWidth;
+            mOldWrapWidth = newWrapWidth;
+
+            if (mWordWrap) {
+                if (mHighlighter != null) {
+                    mHighlighter.setWordWrap(true, newWrapWidth);
+                }
+                if (widthChanged) {
+                    computeLineTops();
+                }
+            } else {
+                calculateMaxWidth();
+            }
             adjustCursorPosition();
             if (isSelectMode) {
-                adjustSelectRange(selectionStart, selectionEnd);
+                setSelection(getSelectionStart(), getSelectionEnd());
             }
-            // Check if initial scroll is needed
-            /*  if (getScrollY() > 0 || getScrollX() > 0) {
-                scrollToVisable();
-            } else {
-                // Ensure we're at the top-left initially
-                scrollTo(0, 0);
-            }*/
+            // Ensure cursor is visible when layout changes (e.g. keyboard opens/resizes)
+            scrollToVisible();
         }
     }
 
-    // ---------- Rendering / Drawing ----------
-    // Top-level draw method
+    @Override
+    protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+        int widthMode = MeasureSpec.getMode(widthMeasureSpec);
+        int widthSize = MeasureSpec.getSize(widthMeasureSpec);
+        int heightMode = MeasureSpec.getMode(heightMeasureSpec);
+        int heightSize = MeasureSpec.getSize(heightMeasureSpec);
+
+        int width;
+        int height;
+
+        if (widthMode == MeasureSpec.EXACTLY) {
+            width = widthSize;
+        } else {
+            width = getLeftSpace() + lineWidth + spaceWidth * 4;
+            if (widthMode == MeasureSpec.AT_MOST) {
+                width = Math.min(width, widthSize);
+            }
+        }
+
+        if (heightMode == MeasureSpec.EXACTLY) {
+            height = heightSize;
+        } else {
+            height = mWordWrap ? mTotalHeight + getLineHeight() * 2 : (getLineCount() + 2) * getLineHeight();
+            if (heightMode == MeasureSpec.AT_MOST) {
+                height = Math.min(height, heightSize);
+            }
+        }
+
+        setMeasuredDimension(width, height);
+    }
+
+    // Main draw method for all renderings
+    @SuppressLint("DrawAllocation")
     @Override
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
-        canvas.save();
-        canvas.clipRect(getScrollX(),
-                getScrollY(),
-                getScrollX() + getWidth() - getPaddingRight(),
-                getScrollY() + getHeight() - getPaddingBottom());
 
+        // Background should be drawn before any scaling transformations
+        canvas.drawColor(Color.WHITE);
+
+        // Clamp scroll if out of bounds (avoids blank editor when heights change)
+        int maxScrollY = getMaxScrollY();
+        if (getScrollY() > maxScrollY) {
+            scrollTo(getScrollX(), maxScrollY);
+        }
+
+        canvas.save();
+
+        if (mIsScaling) {
+            // To keep it "sticky on the left side", if scrollX is small, we anchor horizontal scaling
+            // to the left edge of the content (the padding start).
+            float focalX;
+            if (getScrollX() <= 10) {
+                // Anchor to the content's left edge (in canvas coordinates)
+                focalX = getScrollX() + getPaddingLeft();
+            } else {
+                // Anchor to the finger position
+                focalX = getScrollX() + mZoomFocusX;
+            }
+            canvas.scale(mZoomScale, mZoomScale, focalX, getScrollY() + mZoomFocusY);
+        }
+
+        // Get actual visible content bounds after scale
+        Rect clip = new Rect();
+        canvas.getClipBounds(clip);
+
+        // Translate for padding
         canvas.translate(getPaddingLeft(), getPaddingTop());
 
-        Drawable background = getBackground();
-        if (background != null) {
-            background.draw(canvas);
+        // Adjust clip relative to text origin (0,0) for line lookup
+        Rect drawClip = new Rect(clip);
+        drawClip.offset(-getPaddingLeft(), -getPaddingTop());
+
+        int visibleStartLine = getLogicalLineFromY(drawClip.top);
+        int visibleEndLine = getLogicalLineFromY(drawClip.bottom);
+
+        // Pre-fetch syntax results ONCE per visible line
+        LineResult[] visibleResults = null;
+        if (mHighlighter != null) {
+            int visibleLineCount = Math.max(0, visibleEndLine - visibleStartLine + 1);
+            visibleResults = new LineResult[visibleLineCount];
+            for (int i = 0; i < visibleLineCount; i++) {
+                int lineIndex = visibleStartLine + i;
+                visibleResults[i] = mHighlighter.getOrTokenize(lineIndex, getLine(lineIndex));
+
+                // Discover actual height Just In Time
+                if (mWordWrap && visibleResults[i] != null && visibleResults[i].layout != null) {
+                    int measuredHeight = visibleResults[i].layout.getHeight();
+                    if (measuredHeight != mHeightManager.getHeight(lineIndex)) {
+                        mHeightManager.updateHeight(lineIndex, measuredHeight);
+                        mTotalHeight = mHeightManager.getTotalHeight();
+                    }
+                }
+            }
         }
 
         drawMatchText(canvas);
-        drawLineBackground(canvas);
-        drawEditableText(canvas); // Remove the background drawing from this method
+        drawLineBackground(canvas, visibleStartLine, visibleEndLine, visibleResults);
+        drawIndentationGuidelines(canvas, visibleStartLine, visibleEndLine, visibleResults);
+        drawEditableText(canvas, visibleStartLine, visibleEndLine, visibleResults);
+        drawBraceSeparatorHighlight(canvas);
         drawSelectHandle(canvas);
         drawCursor(canvas);
 
         canvas.restore();
+        // Overlays
+        drawFastScroller(canvas);
     }
 
-    // Draw the editor content (helper)
-    public void drawEditorContent(Canvas canvas, int captureTop, int captureBottom) {
-        int saveCount = canvas.save();
-        canvas.translate(getScrollX(), getScrollY());
-        drawMatchText(canvas);
-        drawLineBackground(canvas);
-        drawEditableText(canvas);
-        drawCursor(canvas);
-        drawSelectHandle(canvas);
-        canvas.restoreToCount(saveCount);
+    // draw fast scroller
+    private void drawFastScroller(Canvas canvas) {
+        int maxScrollY = getMaxScrollY();
+        int maxScrollX = getMaxScrollX();
+        if (maxScrollY <= 0 && maxScrollX <= 0) return;
+
+        // only show if content is significantly larger than view
+        // Threshold: contentHeight > viewHeight * thresholdFactor
+        // or getLineCount() > someThreshold
+        int viewHeight = getHeight();
+        int viewWidth = getWidth();
+
+        // Dynamic threshold: If keyboard is likely showing (viewHeight is small), threshold is lower
+        int screenHeight = ScreenUtils.getScreenHeight(getContext());
+        boolean isKeyboardShowing = viewHeight < screenHeight * 0.7f;
+        int verticalLineThreshold = isKeyboardShowing ? 95 : 182;
+
+        boolean showVertical = getLineCount() > verticalLineThreshold;
+        boolean showHorizontal = !mWordWrap && lineWidth > viewWidth * 1.5f;
+
+        if (!showVertical && !showHorizontal && !mIsDraggingFastScroller && !mIsDraggingFastScrollerHorizontally) {
+            mFastScrollerAlpha = 0;
+            return;
+        }
+
+        long now = System.currentTimeMillis();
+        boolean isAnyDragging = mIsDraggingFastScroller || mIsDraggingFastScrollerHorizontally;
+        if (!isAnyDragging && now - mLastScrollTimeFast > FAST_SCROLLER_HIDE_DELAY) {
+            mFastScrollerAlpha -= 15;
+            if (mFastScrollerAlpha < 0) mFastScrollerAlpha = 0;
+        } else {
+            mFastScrollerAlpha += 25;
+            if (mFastScrollerAlpha > 255) mFastScrollerAlpha = 255;
+        }
+
+        if (mFastScrollerAlpha <= 0) return;
+
+        int scrollY = getScrollY();
+        int scrollX = getScrollX();
+
+        int thumbColorNormal = Color.parseColor("#40808080");
+        int thumbColorDragging = Color.parseColor("#FF1E88E5");
+        int trackColor = 0x11000000;
+
+        // Vertical Scroller
+        if (showVertical) {
+            // Constant thumb height
+            int thumbHeight = ScreenUtils.dip2px(getContext(), FAST_SCROLLER_MIN_THUMB_LENGTH_DP);
+
+            // Calculate position
+            int trackHeight = viewHeight - thumbHeight;
+            float scrollRatio = (float) scrollY / maxScrollY;
+            int thumbY = (int) (scrollRatio * trackHeight);
+
+            int thumbWidth = ScreenUtils.dip2px(getContext(), FAST_SCROLLER_THUMB_THICKNESS_DP);
+            int thumbRight = scrollX + viewWidth;
+            int thumbLeft = thumbRight - thumbWidth;
+            int thumbTop = scrollY + thumbY;
+            int thumbBottom = thumbTop + thumbHeight;
+
+            // Draw track (Always with thumb, same width)
+            mFastScrollerPaint.setColor(trackColor);
+            mFastScrollerPaint.setAlpha((int) (mFastScrollerAlpha * 0.1f));
+            canvas.drawRect(thumbLeft, scrollY, thumbRight, scrollY + viewHeight, mFastScrollerPaint);
+
+            mFastScrollerPaint.setColor(mIsDraggingFastScroller ? thumbColorDragging : thumbColorNormal);
+            mFastScrollerPaint.setAlpha((int) mFastScrollerAlpha);
+
+            // Draw thumb
+            canvas.drawRect(thumbLeft, thumbTop, thumbRight, thumbBottom, mFastScrollerPaint);
+
+            if (mIsDraggingFastScroller) {
+                // Draw line number bubble
+                int currentLine = (int) (scrollRatio * (getLineCount() - 1)) + 1;
+                String text = String.valueOf(currentLine);
+
+                mFastScrollerPaint.setTextSize(mTextPaint.getTextSize() * 0.8f);
+                float textWidth = mFastScrollerPaint.measureText(text);
+                float bubbleWidth = textWidth + ScreenUtils.dip2px(getContext(), 24);
+                float bubbleHeight = getLineHeight() * 1.2f;
+
+                float bubbleX = thumbLeft - bubbleWidth - ScreenUtils.dip2px(getContext(), 12);
+
+                // Keep bubble within view
+                float bubbleY = thumbTop + (thumbHeight / 2f) - (bubbleHeight / 2f);
+                if (bubbleY < scrollY) bubbleY = scrollY;
+                if (bubbleY + bubbleHeight > scrollY + viewHeight)
+                    bubbleY = scrollY + viewHeight - bubbleHeight;
+
+                mFastScrollerPaint.setColor(Color.parseColor("#AA000000"));
+                mFastScrollerPaint.setAlpha(180);
+                android.graphics.RectF bubbleRect = new android.graphics.RectF(bubbleX, bubbleY, bubbleX + bubbleWidth, bubbleY + bubbleHeight);
+                canvas.drawRoundRect(bubbleRect, ScreenUtils.dip2px(getContext(), 8), ScreenUtils.dip2px(getContext(), 8), mFastScrollerPaint);
+
+                mFastScrollerPaint.setColor(Color.WHITE);
+                mFastScrollerPaint.setTextAlign(Paint.Align.CENTER);
+                Paint.FontMetrics fm = mFastScrollerPaint.getFontMetrics();
+                float textY = bubbleY + (bubbleHeight - fm.ascent - fm.descent) / 2;
+                canvas.drawText(text, bubbleX + bubbleWidth / 2, textY, mFastScrollerPaint);
+                mFastScrollerPaint.setTextAlign(Paint.Align.LEFT);
+            }
+        }
+
+        // Horizontal Scroller
+        if (showHorizontal) {
+            // Constant thumb width
+            int thumbWidth = ScreenUtils.dip2px(getContext(), FAST_SCROLLER_MIN_THUMB_LENGTH_DP);
+
+            int trackWidth = viewWidth - thumbWidth;
+            float scrollRatio = (float) scrollX / maxScrollX;
+            int thumbX = (int) (scrollRatio * trackWidth);
+
+            int thumbHeight = ScreenUtils.dip2px(getContext(), FAST_SCROLLER_THUMB_THICKNESS_DP);
+            int thumbBottom = scrollY + viewHeight;
+            int thumbTop = thumbBottom - thumbHeight;
+            int thumbLeft = scrollX + thumbX;
+            int thumbRight = thumbLeft + thumbWidth;
+
+            // Draw track (Always with thumb, same height)
+            mFastScrollerPaint.setColor(trackColor);
+            mFastScrollerPaint.setAlpha((int) (mFastScrollerAlpha * 0.1f));
+            canvas.drawRect(scrollX, thumbTop, scrollX + viewWidth, thumbBottom, mFastScrollerPaint);
+
+            mFastScrollerPaint.setColor(mIsDraggingFastScrollerHorizontally ? thumbColorDragging : thumbColorNormal);
+            mFastScrollerPaint.setAlpha((int) mFastScrollerAlpha);
+
+            canvas.drawRect(thumbLeft, thumbTop, thumbRight, thumbBottom, mFastScrollerPaint);
+        }
+
+        if (mFastScrollerAlpha > 0 && mFastScrollerAlpha < 255) {
+            postInvalidateDelayed(16);
+        }
     }
 
-    // Draw current line background or selection highlight
+    // Draw line backgrounds including selection and syntax highlighting
     public void drawLineBackground(Canvas canvas) {
-        if (mIsLineSelectionMode && mStartSelectionLine > 0 && mEndSelectionLine > 0) {
-            mPaint.setColor(Color.parseColor("#E3F2FD")); // Light blue background
-            int lineNumberWidth = getLineNumberWidth() + SPACEING * 2;
+        Rect clip = new Rect();
+        canvas.getClipBounds(clip);
+        int visibleStartLine = getLogicalLineFromY(clip.top);
+        int visibleEndLine = getLogicalLineFromY(clip.bottom);
 
-            for (int i = mStartSelectionLine; i <= mEndSelectionLine; i++) {
-                int top = (i - 1) * getLineHeight();
-                int bottom = i * getLineHeight();
+        LineResult[] visibleResults = null;
+        if (mHighlighter != null) {
+            int count = visibleEndLine - visibleStartLine + 1;
+            visibleResults = new LineResult[count];
+            for (int i = 0; i < count; i++) {
+                int lineIndex = visibleStartLine + i;
+                visibleResults[i] = mHighlighter.getOrTokenize(lineIndex, getLine(lineIndex));
+            }
+        }
+        drawLineBackground(canvas, visibleStartLine, visibleEndLine, visibleResults);
+    }
 
-                canvas.drawRect(getPaddingLeft(), top,
-                        getPaddingLeft() + lineNumberWidth, bottom, mPaint);
+    public void drawLineBackground(Canvas canvas, int visibleStartLine, int visibleEndLine, LineResult[] visibleResults) {
+        int lineHeight = getLineHeight();
+        Rect clip = new Rect();
+        canvas.getClipBounds(clip);
+
+        int gutterLeftPadding = ScreenUtils.dip2px(getContext(), 12);
+        int lineNumberWidth = getLineNumberWidth();
+        int gutterRightPadding = ScreenUtils.dip2px(getContext(), 6);
+        int separatorWidth = 2;
+        int contentStartX = mShowLineNumbers ? (gutterLeftPadding + lineNumberWidth + gutterRightPadding + separatorWidth) : 0;
+
+        // Draw syntax-based line backgrounds
+        if (mHighlighter != null && visibleResults != null) {
+            int right = clip.right;
+            for (int i = visibleStartLine; i <= visibleEndLine; i++) {
+                LineResult res = visibleResults[i - visibleStartLine];
+                if (res != null) {
+                    // Alignment Fix: Match text rendering baseline shift
+                    float top = getLineTop(i);
+                    float bottom = getLineBottom(i);
+                    mHighlighter.drawLineBackground(canvas, res.text, i, contentStartX, (int) top, right, (int) bottom);
+                }
+            }
+        }
+
+        if (mShowLineNumbers && mIsLineSelectionMode && mStartSelectionLine > 0 && mEndSelectionLine > 0) {
+            mPaint.setColor(Color.parseColor("#E3F2FD"));
+            int gutterAreaWidth = gutterLeftPadding + lineNumberWidth + gutterRightPadding;
+            int gutterStartX = mStickyLineNumbers ? getScrollX() : 0;
+
+            int drawStartLine = Math.max(visibleStartLine, mStartSelectionLine);
+            int drawEndLine = Math.min(visibleEndLine, mEndSelectionLine);
+
+            for (int i = drawStartLine; i <= drawEndLine; i++) {
+                float top = getLineTop(i);
+                float bottom = getLineBottom(i);
+
+                canvas.drawRect(gutterStartX, top,
+                        gutterStartX + gutterAreaWidth, bottom, mPaint);
             }
         }
 
         if (!isSelectMode) {
-            // draw current line background
+            // Alignment Fix: Match text rendering baseline shift
+            float top = getLineTop(mCursorLine);
+            float bottom = getLineBottom(mCursorLine);
+
             mPaint.setColor(Color.parseColor("#FFFAE3"));
-            int left = getPaddingLeft() + getLineNumberWidth() + SPACEING;
-            canvas.drawRect(left,
-                    getPaddingTop() + mCursorPosY,
-                    getScrollX() + getWidth(),
-                    mCursorPosY + getLineHeight(),
+            canvas.drawRect(contentStartX,
+                    top,
+                    clip.right,
+                    bottom,
                     mPaint);
         } else {
-            // draw select text background - BLOCK STYLE (like before)
             mPaint.setColor(Color.parseColor("#B3DBFB"));
+            mPaint.setAntiAlias(false); // Disable AA for solid background blocks to prevent gaps
 
             int left = getLeftSpace();
-            int lineHeight = getLineHeight();
 
-            int startLine = getOffsetLine(selectionStart);
-            int endLine = getOffsetLine(selectionEnd);
+            int selStart = getSelectionStart();
+            int selEnd = getSelectionEnd();
 
-            // Only draw visible selection ranges to reduce lag
-            int visibleStartLine = Math.max(startLine, canvas.getClipBounds().top / lineHeight);
-            int visibleEndLine = Math.min(endLine, canvas.getClipBounds().bottom / lineHeight + 1);
+            // Normalize: Ensure s is always start and e is always end for drawing range
+            int s = Math.min(selStart, selEnd);
+            int e = Math.max(selStart, selEnd);
 
-            // start line < end line
-            if (startLine != endLine) {
-                for (int i = visibleStartLine; i <= visibleEndLine; i++) {
-                    int lineWidth = getLineWidth(i) + spaceWidth;
-                    if (i == startLine) {
-                        // First line - from selection start to end of line
-                        int lineStart = getLineStart(startLine);
-                        String beforeText = mGapBuffer.substring(lineStart, selectionStart);
-                        int selectStartX = left + (int) mTextPaint.measureText(beforeText);
+            int startLine = getOffsetLine(s);
+            int endLine = getOffsetLine(e);
+            int drawStartLine = Math.max(visibleStartLine, startLine);
+            int drawEndLine = Math.min(visibleEndLine, endLine);
 
-                        canvas.drawRect(selectStartX,
-                                (startLine - 1) * lineHeight,
-                                left + lineWidth,
-                                startLine * lineHeight,
-                                mPaint);
-                    } else if (i == endLine) {
-                        // Last line - from line start to selection end
-                        int lineStart = getLineStart(endLine);
-                        String beforeText = mGapBuffer.substring(lineStart, selectionEnd);
-                        int selectEndX = left + (int) mTextPaint.measureText(beforeText);
+            for (int i = drawStartLine; i <= drawEndLine; i++) {
+                String lineText = getLine(i);
+                LineResult res = (mHighlighter != null) ? mHighlighter.getOrTokenize(i, lineText) : null;
+                int lineTop = getLineTop(i);
+                int lineStartIdx = getLineStart(i);
 
-                        canvas.drawRect(left,
-                                (endLine - 1) * lineHeight,
-                                selectEndX,
-                                endLine * lineHeight,
-                                mPaint);
+                if (mWordWrap && res != null && res.layout != null) {
+                    int lineLen = lineText.length();
+                    int selStartInLine = Math.max(0, s - lineStartIdx);
+                    int selEndInLine = Math.min(lineLen, e - lineStartIdx);
+
+                    // Newline is selected if selection end is past the logical line end
+                    boolean highlightNewline = (e > lineStartIdx + lineLen) && (s <= lineStartIdx + lineLen);
+
+                    if (selStartInLine < selEndInLine || highlightNewline) {
+                        canvas.save();
+                        canvas.translate(left, lineTop);
+                        int firstV = getLayoutLineForOffset(res, selStartInLine);
+                        int lastV = getLayoutLineForOffset(res, selEndInLine);
+                        for (int v = firstV; v <= lastV; v++) {
+                            float sX = (v == firstV) ? getLayoutHorizontal(res, selStartInLine) : res.wrapIndent;
+                            float eX;
+                            if (v == lastV) {
+                                eX = getLayoutHorizontal(res, selEndInLine);
+                                if (highlightNewline) {
+                                    eX += spaceWidth;
+                                }
+                            } else {
+                                // Exactly cover all characters on this visual line.
+                                float textEnd = res.layout.getLineMax(v);
+                                if (v > 0) textEnd += res.wrapIndent;
+                                eX = textEnd;
+                            }
+
+                            if (eX > sX) {
+                                float drawTop = res.layout.getLineTop(v);
+                                float drawBottom = res.layout.getLineBottom(v);
+                                canvas.drawRect(sX, drawTop, eX, drawBottom, mPaint);
+                            }
+                        }
+                        canvas.restore();
+                    }
+                } else {
+                    int lWidth;
+                    if (res != null && res.layout != null) {
+                        lWidth = (int) Math.ceil(res.layout.getLineWidth(0));
                     } else {
-                        // Middle lines - full line width
-                        canvas.drawRect(left,
-                                (i - 1) * lineHeight,
-                                left + lineWidth,
-                                i * lineHeight,
-                                mPaint);
+                        lWidth = getLineWidth(i);
+                    }
+                    lWidth += spaceWidth;
+
+                    if (i == startLine && i == endLine) {
+                        int startOffset = s - lineStartIdx;
+                        int endOffset = e - lineStartIdx;
+                        float sX = left + (res != null && res.layout != null ? res.layout.getPrimaryHorizontal(Math.min(startOffset, lineText.length())) : measureText(lineText.substring(0, Math.min(startOffset, lineText.length())), left));
+                        float eX = left + (res != null && res.layout != null ? res.layout.getPrimaryHorizontal(Math.min(endOffset, lineText.length())) : measureText(lineText.substring(0, Math.min(endOffset, lineText.length())), left));
+                        canvas.drawRect(sX, lineTop, eX, getLineBottom(i), mPaint);
+                    } else if (i == startLine) {
+                        int startOffset = s - lineStartIdx;
+                        float sX = left + (res != null && res.layout != null ? res.layout.getPrimaryHorizontal(Math.min(startOffset, lineText.length())) : measureText(lineText.substring(0, Math.min(startOffset, lineText.length())), left));
+                        canvas.drawRect(sX, lineTop, left + lWidth, getLineBottom(i), mPaint);
+                    } else if (i == endLine) {
+                        int endOffset = e - lineStartIdx;
+                        float eX = left + (res != null && res.layout != null ? res.layout.getPrimaryHorizontal(Math.min(endOffset, lineText.length())) : measureText(lineText.substring(0, Math.min(endOffset, lineText.length())), left));
+                        canvas.drawRect(left, lineTop, eX, getLineBottom(i), mPaint);
+                    } else {
+                        canvas.drawRect(left, lineTop, left + lWidth, getLineBottom(i), mPaint);
                     }
                 }
-            } else {
-                // start line = end line - single line selection
-                int lineStart = getLineStart(startLine);
-                String beforeStartText = mGapBuffer.substring(lineStart, selectionStart);
-                String selectedText = mGapBuffer.substring(selectionStart, selectionEnd);
+            }
+            mPaint.setAntiAlias(true);
+        }
 
-                int selectStartX = left + (int) mTextPaint.measureText(beforeStartText);
-                int selectEndX = selectStartX + (int) mTextPaint.measureText(selectedText);
+        // Draw matching brace highlight AFTER all backgrounds to ensure it is visible
+        drawBraceMatch(canvas, visibleStartLine, visibleEndLine);
+    }
 
-                canvas.drawRect(selectStartX,
-                        (startLine - 1) * lineHeight,
-                        selectEndX,
-                        startLine * lineHeight,
-                        mPaint);
+    // Draw indentation guidelines
+    private void drawIndentationGuidelines(Canvas canvas, int visibleStartLine, int visibleEndLine, LineResult[] visibleResults) {
+        if (!mShowIndentGuides || mHighlighter == null || visibleResults == null) return;
+
+        int left = getLeftSpace();
+        float tabWidth = spaceWidth * mTabSize;
+
+        for (int i = visibleStartLine; i <= visibleEndLine; i++) {
+            LineResult res = visibleResults[i - visibleStartLine];
+            if (res == null) continue;
+
+            int startL = res.startBraceLevel;
+            int endL = res.endBraceLevel;
+
+            int maxL = Math.max(startL, endL);
+
+            int top = getLineTop(i);
+            int bottom = getLineBottom(i);
+
+            for (int level = 1; level <= maxL; level++) {
+                float x = left + (level - 1) * tabWidth;
+
+                // Draw guideline only if it's within the block (starts AFTER { and ends BEFORE })
+                if (level <= startL && level <= endL) {
+                    canvas.drawLine(x, top, x, bottom, mGuidelinePaint);
+                }
             }
         }
     }
 
-    // Draw select handles (left/right)
+    // Draw selection handles
     public void drawSelectHandle(Canvas canvas) {
-        if (isSelectMode) {
+        if (isSelectMode && !mHideSelectHandles) {
+            int left = getLeftSpace();
+            int selStart = getSelectionStart();
+            int selEnd = getSelectionEnd();
+
+            // Normalize: Ensure start is always the smaller index for visual stability
+            int s = Math.min(selStart, selEnd);
+            int e = Math.max(selStart, selEnd);
+
+            // Re-calculate positions JIT to ensure handles are always perfectly aligned
+            // regardless of scroll, zoom, or gutter width changes.
+            int startLine = getOffsetLine(s);
+            LineResult startRes = (mHighlighter != null) ? mHighlighter.getOrTokenize(startLine, getLine(startLine)) : null;
+            if (startRes != null && startRes.layout != null) {
+                int off = s - getLineStart(startLine);
+                selectHandleLeftX = left + (int) Math.ceil(getLayoutHorizontal(startRes, off));
+                int vLine = getLayoutLineForOffset(startRes, off);
+                selectHandleLeftY = getLineTop(startLine) + startRes.layout.getLineBottom(vLine);
+            } else {
+                selectHandleLeftX = left + measureText(getLine(startLine).substring(0, Math.max(0, s - getLineStart(startLine))), left);
+                selectHandleLeftY = getLineBottom(startLine);
+            }
+
+            int endLine = getOffsetLine(e);
+            LineResult endRes = (mHighlighter != null) ? mHighlighter.getOrTokenize(endLine, getLine(endLine)) : null;
+            if (endRes != null && endRes.layout != null) {
+                int off = e - getLineStart(endLine);
+                selectHandleRightX = left + (int) Math.ceil(getLayoutHorizontal(endRes, off));
+                int vLine = getLayoutLineForOffset(endRes, off);
+                selectHandleRightY = getLineTop(endLine) + endRes.layout.getLineBottom(vLine);
+            } else {
+                selectHandleRightX = left + measureText(getLine(endLine).substring(0, Math.max(0, e - getLineStart(endLine))), left);
+                selectHandleRightY = getLineBottom(endLine);
+            }
+
             mTextSelectHandleLeftRes.setBounds(selectHandleLeftX - selectHandleWidth + selectHandleWidth / 4,
                     selectHandleLeftY,
                     selectHandleLeftX + selectHandleWidth / 4,
@@ -558,7 +1127,6 @@ public class EditView extends View {
 
             mTextSelectHandleLeftRes.draw(canvas);
 
-            // select handle right
             mTextSelectHandleRightRes.setBounds(selectHandleRightX - selectHandleWidth / 4,
                     selectHandleRightY,
                     selectHandleRightX + selectHandleWidth - selectHandleWidth / 4,
@@ -568,37 +1136,79 @@ public class EditView extends View {
         }
     }
 
-    // Draw match/replace highlights
+    // Draw search match highlights
     public void drawMatchText(Canvas canvas) {
-        if (isSelectMode) {
+        if (mReplaceList != null && !mReplaceList.isEmpty()) {
             int size = mReplaceList.size();
             int left = getLeftSpace();
+            Rect clip = canvas.getClipBounds();
 
-            for (int i = 0; i < size; ++i) {
+            int visibleStartLine = getLogicalLineFromY(clip.top);
+            int startOffsetVisible = getLineStart(visibleStartLine);
+
+            int low = 0, high = size - 1, firstVisibleIdx = 0;
+            while (low <= high) {
+                int mid = (low + high) / 2;
+                if (mReplaceList.get(mid).first >= startOffsetVisible) {
+                    firstVisibleIdx = mid;
+                    high = mid - 1;
+                } else {
+                    low = mid + 1;
+                }
+            }
+
+            int selStart = getSelectionStart();
+            int selEnd = getSelectionEnd();
+            int s = Math.min(selStart, selEnd);
+            int e = Math.max(selStart, selEnd);
+
+            for (int i = firstVisibleIdx; i < size; ++i) {
                 int start = mReplaceList.get(i).first;
                 int end = mReplaceList.get(i).second;
 
-                if (start == selectionStart && end == selectionEnd)
+                int line = mGapBuffer.findLineNumber(start);
+                int lineTop = getLineTop(line);
+                int lineBottom = getLineBottom(line);
+
+                if (lineTop > clip.bottom) break;
+                if (lineBottom < clip.top) continue;
+
+                // Match containing cursor is Yellow, others are standard highlight
+                if (mCursorIndex >= start && mCursorIndex <= end)
                     mPaint.setColor(Color.YELLOW);
                 else
                     mPaint.setColor(Color.parseColor("#FFFD54"));
 
-                int line = mGapBuffer.findLineNumber(start);
-                int lineStart = getLineStart(line);
+                int lineStartIdx = getLineStart(line);
+                String lineText = getLine(line);
+                LineResult res = (mHighlighter != null) ? mHighlighter.getOrTokenize(line, lineText) : null;
 
-                canvas.drawRect(left + measureText(mGapBuffer.substring(lineStart, start)),
-                        (line - 1) * getLineHeight(),
-                        left + measureText(mGapBuffer.substring(lineStart, end)),
-                        line * getLineHeight(),
-                        mPaint
-                );
+                if (res != null && res.layout != null) {
+                    int offStart = start - lineStartIdx;
+                    int offEnd = end - lineStartIdx;
+
+                    int vLine = getLayoutLineForOffset(res, offStart);
+                    float x1 = left + getLayoutHorizontal(res, offStart);
+                    float x2 = left + getLayoutHorizontal(res, offEnd);
+                    float y1 = lineTop + res.layout.getLineTop(vLine);
+                    float y2 = lineTop + res.layout.getLineBottom(vLine);
+
+                    canvas.drawRect(x1, y1, x2, y2, mPaint);
+                } else {
+                    float x1 = left + measureText(lineText.substring(0, Math.max(0, Math.min(start - lineStartIdx, lineText.length()))), left);
+                    float x2 = left + measureText(lineText.substring(0, Math.max(0, Math.min(end - lineStartIdx, lineText.length()))), left);
+                    canvas.drawRect(x1, lineTop, x2, lineBottom, mPaint);
+                }
             }
         }
     }
 
-    // Draw the cursor and middle handle
+    // Draw blinking cursor
     public void drawCursor(Canvas canvas) {
-        if (mCursorVisiable) {
+        if (mCursorVisible && !isSelectMode) {
+            // Re-calculate Y position JIT to stick to text even if heights above update
+            mCursorPosY = getLineTop(mCursorLine) + mCursorYOffsetWithinLine;
+
             int left = getLeftSpace();
             int half = 0;
             if (mCursorPosX >= left) {
@@ -607,108 +1217,1281 @@ public class EditView extends View {
                 mCursorPosX = left;
             }
 
-            // draw text cursor
+            int cursorHeight = getLineHeight();
+            if (mWordWrap && mHighlighter != null) {
+                LineResult res = mHighlighter.getOrTokenize(mCursorLine, getLine(mCursorLine));
+                if (res != null && res.layout != null) {
+                    int vLine = getLayoutLineForOffset(res, mCursorIndex - getLineStart(mCursorLine));
+                    cursorHeight = res.layout.getLineBottom(vLine) - res.layout.getLineTop(vLine);
+                }
+            }
+
             mDrawableCursorRes.setBounds(mCursorPosX - half,
-                    getPaddingTop() + mCursorPosY,
+                    mCursorPosY,
                     mCursorPosX - half + mCursorWidth,
-                    mCursorPosY + getLineHeight()
+                    mCursorPosY + cursorHeight
             );
             mDrawableCursorRes.draw(canvas);
         }
 
-        if (mHandleMiddleVisable) {
-            // draw text select handle middle
+        if (mHandleMiddleVisible && !isSelectMode) {
+            // Update Middle Handle Y JIT
+            mCursorPosY = getLineTop(mCursorLine) + mCursorYOffsetWithinLine;
+            int cursorHeight = getLineHeight();
+            if (mWordWrap && mHighlighter != null) {
+                LineResult res = mHighlighter.getOrTokenize(mCursorLine, getLine(mCursorLine));
+                if (res != null && res.layout != null) {
+                    int vLine = getLayoutLineForOffset(res, mCursorIndex - getLineStart(mCursorLine));
+                    cursorHeight = res.layout.getLineBottom(vLine) - res.layout.getLineTop(vLine);
+                }
+            }
+
             mTextSelectHandleMiddleRes.setBounds(mCursorPosX - handleMiddleWidth / 2,
-                    mCursorPosY + getLineHeight(),
+                    mCursorPosY + cursorHeight,
                     mCursorPosX + handleMiddleWidth / 2,
-                    mCursorPosY + getLineHeight() + handleMiddleHeight
+                    mCursorPosY + cursorHeight + handleMiddleHeight
             );
             mTextSelectHandleMiddleRes.draw(canvas);
         }
     }
 
-    // Draw editable text lines with numbers and syntax highlighting
-
+    // Draw editable text content
     public void drawEditableText(Canvas canvas) {
-        int startLine = Math.max(canvas.getClipBounds().top / getLineHeight(), 1);
-        int endLine = Math.min(canvas.getClipBounds().bottom / getLineHeight() + 1, getLineCount());
+        Rect clip = new Rect();
+        canvas.getClipBounds(clip);
 
+        int startLine = getLogicalLineFromY(clip.top);
+        int endLine = getLogicalLineFromY(clip.bottom);
+
+        LineResult[] visibleResults = null;
+        if (mHighlighter != null) {
+            int count = endLine - startLine + 1;
+            visibleResults = new LineResult[count];
+            for (int i = 0; i < count; i++) {
+                int lineIndex = startLine + i;
+                visibleResults[i] = mHighlighter.getOrTokenize(lineIndex, getLine(lineIndex));
+            }
+        }
+        drawEditableText(canvas, startLine, endLine, visibleResults);
+    }
+
+    public void drawEditableText(Canvas canvas, int startLine, int endLine, LineResult[] visibleResults) {
+        int lineHeight = getLineHeight();
+        Rect clip = new Rect();
+        canvas.getClipBounds(clip);
+
+        int gutterLeftPadding = ScreenUtils.dip2px(getContext(), 12);
         int lineNumberWidth = getLineNumberWidth();
-        lineWidth = getWidth() - lineNumberWidth;
+        int gutterRightPadding = ScreenUtils.dip2px(getContext(), 6);
+        int scrollX = getScrollX();
+        int gutterAreaWidth = gutterLeftPadding + lineNumberWidth + gutterRightPadding;
+        int contentStartX = getLeftSpace();
 
-        int totalContentHeight = getLineCount() * getLineHeight();
+        // 1. Draw the text content first
+        canvas.save();
+        // Clip to the content area so text doesn't bleed into the sticky gutter
+        if (mShowLineNumbers && mStickyLineNumbers) {
+            canvas.clipRect(scrollX + gutterAreaWidth, clip.top, clip.right, clip.bottom);
+        }
 
-        // Draw full-height line number bar background
-        mPaint.setColor(Color.parseColor("#F8F8F8"));
-        canvas.drawRect(
-                getPaddingLeft(),
-                0,
-                getPaddingLeft() + lineNumberWidth + SPACEING * 2,
-                Math.max(getHeight(), totalContentHeight),
-                mPaint
-        );
-
-        // Draw separator line
-        int separatorWidth = 2;
-        int separatorX = getPaddingLeft() + lineNumberWidth + SPACEING * 2 - separatorWidth;
-        mPaint.setColor(Color.parseColor("#E4E4E4"));
-        mPaint.setStrokeWidth(separatorWidth);
-        canvas.drawLine(
-                separatorX,
-                0,
-                separatorX,
-                Math.max(getHeight(), totalContentHeight),
-                mPaint
-        );
-
-        // Margins
-        int leftMargin = 10; // ✅ Space from left edge for line numbers
-        int rightMargin = 13; // Space between line numbers and separator
+        int viewWidth = getWidth();
+        // HORIZONTAL VIRTUALIZATION:
+        int visibleColStart = Math.max(0, (scrollX - contentStartX) / spaceWidth - 2);
+        int visibleColEnd = (scrollX - contentStartX + viewWidth) / spaceWidth + 2;
 
         for (int i = startLine; i <= endLine; i++) {
-            int paintY = i * getLineHeight() - (int) mTextPaint.descent();
-            mTextPaint.setColor(Color.parseColor("#B0B0B0"));
-
-            String lineNumberText = String.valueOf(i);
-            int textWidth = (int) mTextPaint.measureText(lineNumberText);
-
-            // RIGHT aligned, with left and right margins respected
-            int lineNumberX = getPaddingLeft() + leftMargin
-                    + (lineNumberWidth - rightMargin - textWidth);
-
-            canvas.drawText(lineNumberText, lineNumberX, paintY, mTextPaint);
-
-            // Draw text content
-            int contentStartX = separatorX + separatorWidth + 10;
+            int lineTop = getLineTop(i);
+            int paintY = lineTop + (int) Math.ceil(-mTextPaint.ascent());
             String text = getLine(i);
-            lineWidth = Math.max(measureText(text), lineWidth);
+            LineResult res = (visibleResults != null && i - startLine < visibleResults.length) ? visibleResults[i - startLine] : null;
 
-            if (mHighlighter != null && text != null && !text.isEmpty()) {
-                int lineHeight = getLineHeight();
-                int top = (i - 1) * lineHeight;
-                int bottom = i * lineHeight;
-                int left = getPaddingLeft() + getLineNumberWidth() + SPACEING;
-                int right = getScrollX() + getWidth();
-                // Special Cases, like for smali print method line bg
-                // Bugs : You cant see the selected visual when you select method line
-                mHighlighter.drawLineBackground(canvas, text, i, left, top, right, bottom);
-                // Draw line text
-                mHighlighter.drawLineText(canvas, text, i, contentStartX, paintY);
+            if (mHighlighter != null && res != null) {
+                if (res.width > lineWidth && !mWordWrap) {
+                    lineWidth = res.width;
+                }
+                mHighlighter.drawLineText(canvas, text, i, contentStartX, lineTop);
             } else {
+                if (text != null && !mWordWrap) {
+                    int currentW = measureText(text);
+                    if (currentW > lineWidth) {
+                        lineWidth = currentW;
+                    }
+                }
                 mTextPaint.setColor(Color.BLACK);
-                canvas.drawText(text, contentStartX, paintY, mTextPaint);
+                if (text != null && text.length() > visibleColEnd + 100 && !mWordWrap) {
+                    int s = Math.min(text.length(), visibleColStart);
+                    int e = Math.min(text.length(), visibleColEnd + 50);
+                    String visiblePart = text.substring(s, e);
+                    float offsetX = contentStartX + measureText(text.substring(0, s), contentStartX);
+                    drawTextWithTabs(canvas, visiblePart, offsetX, paintY, mTextPaint);
+                } else {
+                    drawTextWithTabs(canvas, text != null ? text : "", contentStartX, paintY, mTextPaint);
+                }
+            }
+
+            // Draw soft wrap icons
+            if (mWordWrap && mShowWrapArrows && res != null && res.layout != null && res.layout.getLineCount() > 1) {
+                int layoutLineCount = res.layout.getLineCount();
+                int wrapIconSize = (int) (lineHeight * 0.45f);
+                int wrapIndent = res.wrapIndent;
+                int iconPadding = ScreenUtils.dip2px(getContext(), 4);
+
+                for (int v = 0; v < layoutLineCount; v++) {
+                    int vTop = lineTop + res.layout.getLineTop(v);
+                    if (vTop > clip.bottom) break;
+                    if (vTop + lineHeight < clip.top) continue;
+
+                    if (v < layoutLineCount - 1) {
+                        float textEnd = res.layout.getLineMax(v);
+                        if (v > 0) textEnd += wrapIndent;
+                        float iconX = contentStartX + textEnd + iconPadding;
+                        if (iconX + wrapIconSize > contentStartX + res.width) {
+                            iconX = contentStartX + res.width - wrapIconSize;
+                        }
+
+                        if (mLeftSoftWrap != null && iconX + wrapIconSize > scrollX && iconX < scrollX + viewWidth) {
+                            mLeftSoftWrap.setBounds((int) iconX, vTop + (lineHeight - wrapIconSize) / 2,
+                                    (int) iconX + wrapIconSize, vTop + (lineHeight + wrapIconSize) / 2);
+                            mLeftSoftWrap.draw(canvas);
+                        }
+                    }
+                    if (v > 0) {
+                        float x = contentStartX + (wrapIndent - wrapIconSize) / 2f;
+                        if (mRightSoftWrap != null && x + wrapIconSize > scrollX && x < scrollX + viewWidth) {
+                            mRightSoftWrap.setBounds((int) x, vTop + (lineHeight - wrapIconSize) / 2,
+                                    (int) x + wrapIconSize, vTop + (lineHeight + wrapIconSize) / 2);
+                            mRightSoftWrap.draw(canvas);
+                        }
+                    }
+                }
+            }
+            // Draw composing underline
+            if (mComposingStart != -1 && mComposingEnd != -1) {
+                int lineStart = getLineStart(i);
+                int lineEnd = getLineEnd(i);
+                int compStart = Math.max(lineStart, mComposingStart);
+                int compEnd = Math.min(lineEnd, mComposingEnd);
+
+                if (compStart < compEnd) {
+                    float startX, endX, underlineY;
+                    if (mWordWrap && res != null && res.layout != null) {
+                        int offStart = compStart - lineStart;
+                        int offEnd = compEnd - lineStart;
+                        int vLine = getLayoutLineForOffset(res, offStart);
+                        startX = contentStartX + getLayoutHorizontal(res, offStart);
+                        endX = contentStartX + getLayoutHorizontal(res, offEnd);
+                        underlineY = lineTop + res.layout.getLineBottom(vLine) - 2;
+                    } else if (res != null && res.layout != null) {
+                        int offStart = compStart - lineStart;
+                        int offEnd = compEnd - lineStart;
+                        startX = contentStartX + getLayoutHorizontal(res, offStart);
+                        endX = contentStartX + getLayoutHorizontal(res, offEnd);
+                        underlineY = paintY + 2;
+                    } else {
+                        startX = contentStartX + measureText(text.substring(0, Math.max(0, Math.min(compStart - lineStart, text.length()))), contentStartX);
+                        endX = contentStartX + measureText(text.substring(0, Math.max(0, Math.min(compEnd - lineStart, text.length()))), contentStartX);
+                        underlineY = paintY + 2;
+                    }
+
+                    mPaint.setColor(mTextPaint.getColor());
+                    mPaint.setStyle(Paint.Style.FILL);
+                    canvas.drawRect(startX, underlineY, endX, underlineY + 2, mPaint);
+                }
+            } else if (i == mCursorLine && !isSelectMode) {
+                // Word underlining at cursor
+                if (mCursorWordBounds != null) {
+                    int lineStart = getLineStart(i);
+                    int wordStart = Math.max(lineStart, mCursorWordBounds[0]);
+                    int wordEnd = Math.min(getLineEnd(i) + 1, mCursorWordBounds[1]);
+
+                    if (wordStart < wordEnd) {
+                        float startX, endX, underlineY;
+
+                        if (mWordWrap && res != null && res.layout != null) {
+                            int offStart = wordStart - lineStart;
+                            int offEnd = wordEnd - lineStart;
+                            int vLine = getLayoutLineForOffset(res, offStart);
+                            startX = contentStartX + getLayoutHorizontal(res, offStart);
+                            endX = contentStartX + getLayoutHorizontal(res, offEnd);
+                            underlineY = lineTop + res.layout.getLineBottom(vLine) - 2;
+                        } else if (res != null && res.layout != null) {
+                            int offStart = wordStart - lineStart;
+                            int offEnd = wordEnd - lineStart;
+                            startX = contentStartX + getLayoutHorizontal(res, offStart);
+                            endX = contentStartX + getLayoutHorizontal(res, offEnd);
+                            underlineY = paintY + 2;
+                        } else {
+                            startX = contentStartX + measureText(text.substring(0, Math.max(0, Math.min(wordStart - lineStart, text.length()))), contentStartX);
+                            endX = contentStartX + measureText(text.substring(0, Math.max(0, Math.min(wordEnd - lineStart, text.length()))), contentStartX);
+                            underlineY = paintY + 2;
+                        }
+
+                        mPaint.setColor(Color.parseColor("#55534C"));
+                        mPaint.setAlpha(120);
+                        mPaint.setStyle(Paint.Style.FILL);
+                        canvas.drawRect(startX, underlineY, endX, underlineY + 3, mPaint);
+                        mPaint.setAlpha(255);
+                    }
+                }
+            }
+        }
+        canvas.restore();
+
+        // 2. Draw the Sticky Gutter ON TOP
+        if (mShowLineNumbers) {
+            int gutterStartX = mStickyLineNumbers ? scrollX : 0;
+
+            // Gutter background
+            mPaint.setColor(Color.parseColor("#F8F8F8"));
+            mPaint.setStyle(Paint.Style.FILL);
+            canvas.drawRect(
+                    gutterStartX,
+                    clip.top,
+                    gutterStartX + gutterAreaWidth,
+                    clip.bottom,
+                    mPaint
+            );
+
+            // Separator line
+            int separatorWidth = 3;
+            int separatorX = gutterStartX + gutterAreaWidth;
+            mPaint.setColor(Color.parseColor("#E4E4E4"));
+            mPaint.setStrokeWidth(separatorWidth);
+            canvas.drawLine(
+                    separatorX,
+                    clip.top,
+                    separatorX,
+                    clip.bottom,
+                    mPaint
+            );
+
+            // Line numbers
+            mTextPaint.setColor(Color.parseColor("#B0B0B0"));
+            for (int i = startLine; i <= endLine; i++) {
+                int lineTop = getLineTop(i);
+                String lineNumberText = String.valueOf(i);
+                int textWidth = (int) mTextPaint.measureText(lineNumberText);
+                int paintY = lineTop + (int) Math.ceil(-mTextPaint.ascent());
+                float drawX = gutterStartX + gutterLeftPadding + (lineNumberWidth - textWidth);
+                canvas.drawText(lineNumberText, drawX, paintY, mTextPaint);
+            }
+        }
+    }
+
+    // Draw brace match highlights
+    private void drawBraceMatch(Canvas canvas, int visibleStartLine, int visibleEndLine) {
+        if (mCurrentBraceIndex != -1 && mCurrentBraceLine != -1) {
+            drawSingleBraceHighlight(canvas, mCurrentBraceIndex, mCurrentBraceLine, visibleStartLine, visibleEndLine);
+        }
+        if (mMatchingBraceIndex != -1 && mMatchingBraceLine != -1) {
+            drawSingleBraceHighlight(canvas, mMatchingBraceIndex, mMatchingBraceLine, visibleStartLine, visibleEndLine);
+        }
+
+        // Draw continuous gutter background between braces
+        if (mShowLineNumbers && mCurrentBraceLine != -1 && mMatchingBraceLine != -1) {
+            int startLine = Math.min(mCurrentBraceLine, mMatchingBraceLine);
+            int endLine = Math.max(mCurrentBraceLine, mMatchingBraceLine);
+
+            int drawStartLine = Math.max(visibleStartLine, startLine);
+            int drawEndLine = Math.min(visibleEndLine, endLine);
+
+            if (drawStartLine <= drawEndLine) {
+                int gutterLeftPadding = ScreenUtils.dip2px(getContext(), 12);
+                int lineNumberWidth = getLineNumberWidth();
+                int gutterRightPadding = ScreenUtils.dip2px(getContext(), 6);
+                int gutterAreaWidth = gutterLeftPadding + lineNumberWidth + gutterRightPadding;
+                int gutterStartX = mStickyLineNumbers ? getScrollX() : 0;
+
+                Paint gutterPaint = new Paint(mBracePaint);
+                gutterPaint.setAlpha(26);
+                canvas.drawRect(gutterStartX, getLineTop(drawStartLine), gutterStartX + gutterAreaWidth, getLineBottom(drawEndLine), gutterPaint);
+            }
+        }
+    }
+
+    private void drawSingleBraceHighlight(Canvas canvas, int index, int line, int visibleStartLine, int visibleEndLine) {
+        if (line < visibleStartLine || line > visibleEndLine) return;
+
+        int left = getLeftSpace();
+        int lineStart = getLineStart(line);
+        String text = getLine(line);
+        int offset = index - lineStart;
+
+        if (text == null || offset < 0 || offset >= text.length()) return;
+
+        float braceX;
+        float braceWidth;
+        float braceTop;
+        float braceBottom;
+
+        LineResult result = (mHighlighter != null) ? mHighlighter.getOrTokenize(line, text) : null;
+        if (result != null && result.layout != null) {
+            int offsetInLine = offset;
+            int vLine = getLayoutLineForOffset(result, offsetInLine);
+
+            braceX = left + getLayoutHorizontal(result, offsetInLine);
+
+            // Calculate width safely using layouts
+            int nextOffset = offsetInLine + 1;
+            float nextX;
+            if (nextOffset <= text.length() && getLayoutLineForOffset(result, nextOffset) == vLine) {
+                nextX = left + getLayoutHorizontal(result, nextOffset);
+                braceWidth = nextX - braceX;
+            } else {
+                // If it's the last character on a visual line, measure the character itself
+                String charAt = text.substring(offsetInLine, offsetInLine + 1);
+                braceWidth = mTextPaint.measureText(charAt);
+            }
+
+            // Draw matching brace highlight AFTER all backgrounds to ensure it is visible
+            braceTop = getLineTop(line) + result.layout.getLineTop(vLine);
+            braceBottom = getLineTop(line) + result.layout.getLineBottom(vLine);
+        } else {
+            braceX = left + measureText(text.substring(0, offset), left);
+            braceWidth = measureText(text.substring(offset, offset + 1), left);
+            braceTop = getLineTop(line);
+            braceBottom = getLineBottom(line);
+        }
+
+        canvas.drawRect(braceX, braceTop, braceX + braceWidth, braceBottom, mBracePaint);
+    }
+
+    private void drawBraceSeparatorHighlight(Canvas canvas) {
+        if (mShowLineNumbers && mCurrentBraceLine != -1 && mMatchingBraceLine != -1) {
+            int startLine = Math.min(mCurrentBraceLine, mMatchingBraceLine);
+            int endLine = Math.max(mCurrentBraceLine, mMatchingBraceLine);
+
+            Rect clip = canvas.getClipBounds();
+            int visibleStartLine = getLogicalLineFromY(clip.top);
+            int visibleEndLine = getLogicalLineFromY(clip.bottom);
+
+            int drawStartLine = Math.max(visibleStartLine, startLine);
+            int drawEndLine = Math.min(visibleEndLine, endLine);
+
+            if (drawStartLine <= drawEndLine) {
+                int gutterLeftPadding = ScreenUtils.dip2px(getContext(), 12);
+                int lineNumberWidth = getLineNumberWidth();
+                int gutterRightPadding = ScreenUtils.dip2px(getContext(), 6);
+                int gutterAreaWidth = gutterLeftPadding + lineNumberWidth + gutterRightPadding;
+                int gutterStartX = mStickyLineNumbers ? getScrollX() : 0;
+                int separatorX = gutterStartX + gutterAreaWidth;
+                int separatorWidth = 3;
+
+                Paint separatorPaint = new Paint();
+                separatorPaint.setColor(Color.parseColor("#669797"));
+                separatorPaint.setStrokeWidth(separatorWidth);
+
+                float startY = getLineTop(drawStartLine);
+                float endY = getLineBottom(drawEndLine);
+
+                canvas.drawLine(separatorX, startY, separatorX, endY, separatorPaint);
+            }
+        }
+    }
+
+    // No-origin version: used only for widths that don't need tab-stop anchoring
+    // (line number width, lineWidth tracking, getLineWidth)
+    public int measureText(String text) {
+        return measureText(text, 0f);
+    }
+
+    // Origin-aware version: ALL drawing/cursor/selection X positions must use this
+    public int measureText(String text, float originX) {
+        if (text == null || text.isEmpty()) return 0;
+
+        if (text.indexOf('\t') == -1) {
+            return (int) Math.ceil(mTextPaint.measureText(text));
+        }
+
+        float totalWidth = 0;
+        float spaceWidth = mTextPaint.measureText(" ");
+        float tabWidth = spaceWidth * mTabSize;
+
+        int len = text.length();
+        int start = 0;
+        for (int i = 0; i < len; i++) {
+            if (text.charAt(i) == '\t') {
+                if (i > start) {
+                    totalWidth += mTextPaint.measureText(text, start, i);
+                }
+                float absoluteX = originX + totalWidth;
+                float nextTab = ((int) (absoluteX / tabWidth + 0.001f) + 1) * tabWidth;
+                totalWidth = nextTab - originX;
+                start = i + 1;
+            }
+        }
+        if (start < len) {
+            totalWidth += mTextPaint.measureText(text, start, len);
+        }
+        return (int) Math.ceil(totalWidth);
+    }
+
+    private void drawTextWithTabs(Canvas canvas, String text, float x, float y, Paint paint) {
+        if (text == null || text.isEmpty()) return;
+
+        float currentX = x;
+        float spaceWidth = paint.measureText(" ");
+        float tabWidth = spaceWidth * mTabSize;
+
+        int start = 0;
+        for (int i = 0; i < text.length(); i++) {
+            if (text.charAt(i) == '\t') {
+                if (i > start) {
+                    String segment = text.substring(start, i);
+                    canvas.drawText(segment, currentX, y, paint);
+                    currentX += paint.measureText(segment);
+                }
+                // Tab stop relative to content origin x
+                float relativeX = currentX - x;
+                float nextTabRel = ((int) (relativeX / tabWidth + 0.001f) + 1) * tabWidth;
+                currentX = x + nextTabRel;
+                start = i + 1;
+            }
+        }
+        if (start < text.length()) {
+            canvas.drawText(text.substring(start), currentX, y, paint);
+        }
+    }
+
+    public int getLineHeight() {
+        TextPaint.FontMetricsInt metrics = mTextPaint.getFontMetricsInt();
+        return metrics.bottom - metrics.top;
+    }
+
+    private int getLineNumberWidth() {
+        return measureText(Integer.toString(getLineCount()));
+    }
+
+    public int getLeftSpace() {
+        if (!mShowLineNumbers) {
+            return ScreenUtils.dip2px(getContext(), 12);
+        }
+        int gutterLeftPadding = ScreenUtils.dip2px(getContext(), 12);
+        int lineNumberWidth = getLineNumberWidth();
+        int gutterRightPadding = ScreenUtils.dip2px(getContext(), 6);
+        int separatorWidth = 2;
+        int contentPadding = ScreenUtils.dip2px(getContext(), 4);
+
+        return gutterLeftPadding + lineNumberWidth + gutterRightPadding + separatorWidth + contentPadding;
+    }
+
+    private int getLineTop(int line) {
+        if (!mWordWrap) {
+            return (line - 1) * getLineHeight();
+        }
+        return mHeightManager.getTop(line);
+    }
+
+    private int getLineBottom(int line) {
+        if (!mWordWrap) {
+            return line * getLineHeight();
+        }
+        return mHeightManager.getBottom(line);
+    }
+
+    private void computeLineTops() {
+        int count = getLineCount();
+        // DO NOT measure every line here.
+        mHeightManager.init(count, getLineHeight());
+        mTotalHeight = mHeightManager.getTotalHeight();
+    }
+
+    private int getLogicalLineFromY(float y) {
+        if (!mWordWrap) {
+            int line = (int) (y / getLineHeight()) + 1;
+            return Math.max(1, Math.min(line, getLineCount()));
+        }
+        return mHeightManager.getLineAtY((int) y);
+    }
+
+    private void ensureHeightsMeasuredUntil(int targetY) {
+        // No-op for performance. Individual interactions now measure JIT.
+    }
+
+    private float getLayoutHorizontal(LineResult res, int originalOffsetInLine) {
+        if (res == null || res.layout == null) return 0;
+        int layoutOffset = originalOffsetInLine;
+        if (res.shiftMap != null && originalOffsetInLine >= 0) {
+            if (originalOffsetInLine < res.shiftMap.length) {
+                layoutOffset += res.shiftMap[originalOffsetInLine];
+            } else if (res.shiftMap.length > 0) {
+                // For the end of the line, use the last known shift
+                layoutOffset += res.shiftMap[res.shiftMap.length - 1];
+            }
+        }
+        int clampedOffset = Math.max(0, Math.min(layoutOffset, res.layout.getText().length()));
+        return res.layout.getPrimaryHorizontal(clampedOffset);
+    }
+
+    private int getLayoutLineForOffset(LineResult res, int originalOffsetInLine) {
+        if (res == null || res.layout == null) return 0;
+        int layoutOffset = originalOffsetInLine;
+        if (res.shiftMap != null && originalOffsetInLine >= 0) {
+            if (originalOffsetInLine < res.shiftMap.length) {
+                layoutOffset += res.shiftMap[originalOffsetInLine];
+            } else if (res.shiftMap.length > 0) {
+                layoutOffset += res.shiftMap[res.shiftMap.length - 1];
+            }
+        }
+        return res.layout.getLineForOffset(Math.max(0, Math.min(layoutOffset, res.layout.getText().length())));
+    }
+
+    private int getOriginalOffset(LineResult res, int layoutLine, float x) {
+        if (res == null || res.layout == null) return 0;
+        int layoutOffset = res.layout.getOffsetForHorizontal(layoutLine, x);
+        if (res.shiftMap == null) return layoutOffset;
+
+        int len = res.shiftMap.length;
+        if (len == 0) return layoutOffset;
+
+        // Binary search for the original offset that maps to layoutOffset
+        int low = 0;
+        int high = len; // Can return up to len (end of string)
+        while (low < high) {
+            int mid = (low + high) / 2;
+            int currentShift = (mid < len) ? res.shiftMap[mid] : res.shiftMap[len - 1];
+            int modIdx = mid + currentShift;
+
+            if (modIdx < layoutOffset) {
+                low = mid + 1;
+            } else {
+                high = mid;
+            }
+        }
+        return low;
+    }
+
+    public Rect getBoundingBox(int index) {
+        int left = getLeftSpace();
+        int line = getOffsetLine(index);
+        int lineStart = getLineStart(line);
+        int x;
+        int y;
+        int height;
+
+        if (mHighlighter != null) {
+            LineResult result = mHighlighter.getOrTokenize(line, getLine(line));
+            if (result != null && result.layout != null) {
+                int offsetInLine = index - lineStart;
+                x = left + (int) Math.ceil(getLayoutHorizontal(result, offsetInLine));
+                if (mWordWrap) {
+                    int vLine = getLayoutLineForOffset(result, offsetInLine);
+                    y = getLineTop(line) + result.layout.getLineTop(vLine);
+                    height = result.layout.getLineBottom(vLine) - result.layout.getLineTop(vLine);
+                } else {
+                    y = getLineTop(line);
+                    height = getLineHeight();
+                }
+            } else {
+                String text = mGapBuffer.substring(lineStart, Math.min(index, mGapBuffer.length()));
+                x = left + measureText(text);
+                y = getLineTop(line);
+                height = getLineHeight();
+            }
+        } else {
+            String text = mGapBuffer.substring(lineStart, Math.min(index, mGapBuffer.length()));
+            x = left + measureText(text);
+            y = getLineTop(line);
+            height = getLineHeight();
+        }
+
+        int viewX = x - getScrollX() + getPaddingLeft();
+        int viewY = y - getScrollY() + getPaddingTop();
+
+        return new Rect(viewX, viewY, viewX + (int) mTextPaint.measureText(" "), viewY + height);
+    }
+
+    private void calculateMaxWidth() {
+        if (mGapBuffer == null || mIsCalculatingMaxWidth || mWordWrap) return;
+
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                mIsCalculatingMaxWidth = true;
+                try {
+                    int maxChars = 0;
+                    int lineCount = getLineCount();
+                    float spaceW = mTextPaint.measureText(" ");
+
+                    // Faster estimation of max width by calling getLineOffset once per line
+                    int lastOffset = mGapBuffer.getLineOffset(1);
+                    for (int i = 1; i <= lineCount; i++) {
+                        // Yield to other threads periodically
+                        if (i % 500 == 0) {
+                            try {
+                                Thread.sleep(5);
+                            } catch (InterruptedException e) {
+                            }
+                        }
+
+                        int nextOffset = (i < lineCount) ? mGapBuffer.getLineOffset(i + 1) : mGapBuffer.length();
+                        int lineLen = nextOffset - lastOffset;
+                        // Skip newline char if present
+                        if (lineLen > 0 && i < lineCount) lineLen--;
+
+                        if (lineLen > maxChars) {
+                            maxChars = lineLen;
+                        }
+                        lastOffset = nextOffset;
+                    }
+
+                    final int finalLineWidth = (int) (maxChars * spaceW) + (mTabSize * (int) spaceW);
+
+                    post(new Runnable() {
+                        @Override
+                        public void run() {
+                            if (finalLineWidth > lineWidth) {
+                                lineWidth = finalLineWidth;
+                                postInvalidate();
+                            }
+                        }
+                    });
+                } catch (Exception e) {
+                    Log.e(TAG, "Error calculating max width", e);
+                } finally {
+                    mIsCalculatingMaxWidth = false;
+                }
+            }
+        }).start();
+    }
+
+    private void updateLineWidth() {
+        int lineCount = getLineCount();
+        if (mCursorLine < 1 || mCursorLine > lineCount) {
+            mCursorLine = Math.max(1, Math.min(mCursorLine, lineCount));
+        }
+        int currentLineW = measureText(getLine(mCursorLine));
+        if (currentLineW > lineWidth) {
+            lineWidth = currentLineW;
+        }
+    }
+
+    private int getWrapWidth() {
+        int width = getWidth() - getLeftSpace() - ScreenUtils.dip2px(getContext(), 24);
+        return Math.max(width, 100); // Minimum width
+    }
+
+    public int getMaxScrollX() {
+        if (mWordWrap) return 0;
+        return Math.max(0, getLeftSpace() + lineWidth + spaceWidth * 4 - getWidth());
+    }
+
+    public int getMaxScrollY() {
+        int height = mWordWrap ? mTotalHeight : (getLineCount() + 2) * getLineHeight();
+        return Math.max(0, height - getHeight() + (mWordWrap ? getLineHeight() : 0));
+    }
+
+    private void clearSyntaxCache() {
+        if (mHighlighter != null) {
+            mHighlighter.clearCache();
+            postInvalidate();
+        }
+    }
+
+    public boolean getEditedMode() {
+        return isEditedMode;
+    }
+
+    public void setEditedMode(boolean editMode) {
+        isEditedMode = editMode;
+    }
+
+    public boolean isShowLineNumbers() {
+        return mShowLineNumbers;
+    }
+
+    public void setShowLineNumbers(boolean show) {
+        if (mShowLineNumbers != show) {
+            mShowLineNumbers = show;
+            requestLayout();
+            postInvalidate();
+        }
+    }
+
+    public boolean isStickyLineNumbers() {
+        return mStickyLineNumbers;
+    }
+
+    public void setStickyLineNumbers(boolean sticky) {
+        if (mStickyLineNumbers != sticky) {
+            mStickyLineNumbers = sticky;
+            postInvalidate();
+        }
+    }
+
+    public boolean isWordWrap() {
+        return mWordWrap;
+    }
+
+    public void setWordWrap(boolean enabled) {
+        if (mWordWrap != enabled) {
+            mWordWrap = enabled;
+            if (mHighlighter != null) {
+                mHighlighter.setWordWrap(enabled, getWrapWidth());
+                mHighlighter.clearCache();
+            }
+            if (enabled) {
+                computeLineTops();
+                // Performance Optimization: Measure currently visible lines plus cursor line JIT
+                // to avoid "jumping" when wrap is first enabled.
+                int scrollY = getScrollY();
+                int height = getHeight();
+                if (height > 0) {
+                    int start = Math.max(1, getLogicalLineFromY(scrollY));
+                    int end = Math.min(getLineCount(), getLogicalLineFromY(scrollY + height) + 1);
+                    for (int i = start; i <= end; i++) {
+                        LineResult res = mHighlighter != null ? mHighlighter.getOrTokenize(i, getLine(i)) : null;
+                        if (res != null && res.layout != null) {
+                            mHeightManager.updateHeight(i, res.layout.getHeight());
+                        }
+                    }
+                    mTotalHeight = mHeightManager.getTotalHeight();
+                }
+            } else {
+                mLineTops = null;
+                mTotalHeight = 0;
+                lineWidth = 0;
+                updateLineWidth();
+            }
+            adjustCursorPosition();
+            if (isSelectMode) {
+                updateSelectionHandles();
+            }
+            requestLayout();
+            postInvalidate();
+        }
+    }
+
+    public boolean isAutoIndentEnabled() {
+        return mAutoIndentEnabled;
+    }
+
+    public void setAutoIndentEnabled(boolean enabled) {
+        mAutoIndentEnabled = enabled;
+    }
+
+    public boolean isShowIndentGuides() {
+        return mShowIndentGuides;
+    }
+
+    public void setShowIndentGuides(boolean show) {
+        if (mShowIndentGuides != show) {
+            mShowIndentGuides = show;
+            postInvalidate();
+        }
+    }
+
+    public boolean isShowWrapArrows() {
+        return mShowWrapArrows;
+    }
+
+    public void setShowWrapArrows(boolean show) {
+        if (mShowWrapArrows != show) {
+            mShowWrapArrows = show;
+            postInvalidate();
+        }
+    }
+
+    public boolean isMagnifierEnabled() {
+        return mMagnifierEnabled;
+    }
+
+    public void setMagnifierEnabled(boolean enabled) {
+        mMagnifierEnabled = enabled;
+        if (!enabled && mIsMagnifierShowing) {
+            dismissMagnifier();
+        }
+    }
+
+    public boolean isAutoCompleteEnabled() {
+        return mAutoCompleteEnabled;
+    }
+
+    public void setAutoCompleteEnabled(boolean enabled) {
+        this.mAutoCompleteEnabled = enabled;
+        if (!enabled) {
+            dismissAutoComplete();
+        }
+    }
+
+    public void setTypeface(Typeface typeface) {
+        mTextPaint.setTypeface(typeface);
+        spaceWidth = (int) Math.ceil(mTextPaint.measureText(" "));
+        if (spaceWidth <= 0) spaceWidth = 1;
+        if (mHighlighter != null) {
+            mHighlighter.updateTabStops();
+            mHighlighter.clearLayoutCache();
+        }
+        lineWidth = 0;
+        updateLineWidth();
+        adjustCursorPosition();
+        if (isSelectMode) {
+            updateSelectionHandles();
+        }
+        postInvalidate();
+    }
+
+    public int getTabSize() {
+        return mTabSize;
+    }
+
+    public void setTabSize(int size) {
+        if (size > 0 && size != mTabSize) {
+            mTabSize = size;
+            if (mHighlighter != null) {
+                mHighlighter.setTabSize(size);
+            }
+            clearSyntaxCache();
+            invalidate();
+        }
+    }
+
+    public float getTextSize() {
+        return mTextPaint.getTextSize();
+    }
+
+    public void setTextSize(float size) {
+        setTextSize(size, 0, 0, false);
+    }
+
+    public void setTextSize(float size, float focusX, float focusY, boolean useFocus) {
+        float min = ScreenUtils.dip2px(getContext(), 10);
+        float max = ScreenUtils.dip2px(getContext(), 30);
+
+        float px = size;
+        if (px < min) px = min;
+        if (px > max) px = max;
+
+        float oldSize = mTextPaint.getTextSize();
+        if (px == oldSize) return;
+
+        int oldLineHeight = getLineHeight();
+        int oldLeftSpace = getLeftSpace();
+        int oldScrollX = getScrollX();
+        int oldScrollY = getScrollY();
+
+        // Calculate focal point in content coordinates
+        float vFocusX = focusX - getPaddingLeft();
+        float vFocusY = focusY - getPaddingTop();
+        float contentX = vFocusX + oldScrollX;
+        float contentY = vFocusY + oldScrollY;
+
+        int focalLine = getLogicalLineFromY(contentY);
+        float lineTop = getLineTop(focalLine);
+        float lineHeightOnFocal = getLineBottom(focalLine) - lineTop;
+        float relativeYInLine = (lineHeightOnFocal > 0) ? (contentY - lineTop) / lineHeightOnFocal : 0;
+
+        mTextPaint.setTextSize(px);
+
+        // Update spaceWidth for consistent measurements across the editor
+        spaceWidth = (int) Math.ceil(mTextPaint.measureText(" "));
+
+        int newLeftSpace = getLeftSpace();
+        int newLineHeightTotal = getLineHeight();
+        float ratioX = px / oldSize;
+        float ratioY = (float) newLineHeightTotal / oldLineHeight;
+
+        if (mHighlighter != null) {
+            mHighlighter.clearLayoutCache();
+            mHighlighter.updateTabStops();
+            if (mWordWrap) {
+                mHighlighter.setWordWrap(true, getWrapWidth());
             }
         }
 
-        mPaint.setColor(Color.parseColor("#FFFAE3"));
-        mPaint.setStrokeWidth(0);
+        if (mWordWrap) {
+            mHeightManager.scaleHeights(ratioY, newLineHeightTotal);
+            mTotalHeight = mHeightManager.getTotalHeight();
+        }
+
+        // Approximate new horizontal bounds
+        lineWidth = (int) (lineWidth * ratioX);
+
+        adjustCursorPosition();
+        if (isSelectMode) {
+            updateSelectionHandles();
+        }
+
+        if (useFocus) {
+            int newScrollX;
+            // Sticky Left Side: If we are at the left edge or zooming near the gutter, keep it at 0
+            if (oldScrollX <= 10 && vFocusX < newLeftSpace * 1.5f) {
+                newScrollX = 0;
+            } else {
+                // Precise scaling relative to text start, accounting for the gutter
+                float textRelX = contentX - oldLeftSpace;
+                float newContentX = newLeftSpace + textRelX * ratioX;
+                newScrollX = (int) (newContentX - vFocusX);
+            }
+
+            // Precise vertical scaling using line-relative positioning
+            float newFocalLineTop = getLineTop(focalLine);
+            float newFocalLineHeight = getLineBottom(focalLine) - newFocalLineTop;
+            int newScrollY = (int) (newFocalLineTop + relativeYInLine * newFocalLineHeight - vFocusY);
+
+            newScrollX = Math.max(0, Math.min(newScrollX, getMaxScrollX()));
+            newScrollY = Math.max(0, Math.min(newScrollY, getMaxScrollY()));
+
+            scrollTo(newScrollX, newScrollY);
+        } else {
+            // Scale scroll position relative to text start to avoid gutter-induced drift
+            int newScrollX = (int) ((oldScrollX + oldLeftSpace) * ratioX - newLeftSpace);
+            int newScrollY = (int) (oldScrollY * (float) newLineHeightTotal / oldLineHeight);
+
+            newScrollX = Math.max(0, Math.min(newScrollX, getMaxScrollX()));
+            newScrollY = Math.max(0, Math.min(newScrollY, getMaxScrollY()));
+
+            scrollTo(newScrollX, newScrollY);
+        }
+        postInvalidate();
     }
 
-    // ---------- Input Handling (touch/keyboard/IME) ----------
-    // Handle touch events (dispatch gesture detectors)
+    public void setSyntaxLanguageFileName(String languageFile) {
+        if (languageFile == null || languageFile.isEmpty()) {
+            mHighlighter = new MHSyntaxHighlightEngine(getContext(), mTextPaint, null, isSyntaxDarkMode);
+            mHighlighter.setLineProvider(new MHSyntaxHighlightEngine.LineProvider() {
+                @Override
+                public String getLine(int index) {
+                    return EditView.this.getLine(index);
+                }
+            });
+            lineWidth = 0;
+            updateLineWidth();
+            adjustCursorPosition();
+            if (isSelectMode) {
+                updateSelectionHandles();
+            }
+            postInvalidate();
+            dismissAutoComplete();
+            return;
+        }
+        mHighlighter = new MHSyntaxHighlightEngine(getContext(), mTextPaint, languageFile, isSyntaxDarkMode);
+        mHighlighter.setWordWrap(mWordWrap, getWrapWidth());
+        mHighlighter.setLineProvider(new MHSyntaxHighlightEngine.LineProvider() {
+            @Override
+            public String getLine(int index) {
+                return EditView.this.getLine(index);
+            }
+        });
+        lineWidth = 0;
+        updateLineWidth();
+        adjustCursorPosition();
+        if (isSelectMode) {
+            updateSelectionHandles();
+        }
+        postInvalidate();
+        dismissAutoComplete();
+    }
+
+    public void setInstructions(Set<String> instructions) {
+        this.mWordSet = instructions;
+    }
+
+    public String getCommentBlock() {
+        String block = mHighlighter.getCommentSyntaxBlock();
+        if (block == null) return "";
+        return block;
+    }
+
+    public void setOnTextChangedListener(OnTextChangedListener listener) {
+        mTextListener = listener;
+    }
+
+    public void setOnSelectionChangeListener(OnSelectionChangeListener listener) {
+        mSelectionListener = listener;
+    }
+
+    public void addTextChangedListener(TextWatcher watcher) {
+        if (mGapBuffer != null) {
+            mGapBuffer.addTextChangedListener(watcher);
+        }
+    }
+
+    public void removeTextChangedListener(TextWatcher watcher) {
+        if (mGapBuffer != null) {
+            mGapBuffer.removeTextChangedListener(watcher);
+        }
+    }
+
+    public void setMenuStyle(ClipboardPanel.MenuDisplayMode mode) {
+        mClipboardPanel.setMenuDisplayMode(mode);
+    }
+
+    public GapBuffer getBuffer() {
+        return this.mGapBuffer;
+    }
+
+    public void setBuffer(GapBuffer buffer) {
+        if (mGapBuffer != null) {
+            mGapBuffer.removeTextChangedListener(mInternalWatcher);
+        }
+        mGapBuffer = buffer != null ? buffer : new GapBuffer();
+        mGapBuffer.addTextChangedListener(mInternalWatcher);
+        Selection.setSelection(mGapBuffer, 0, 0);
+        mCursorIndex = 0;
+        mCursorLine = 1;
+        mCursorPosX = getLeftSpace();
+        mCursorPosY = 0;
+        mComposingStart = -1;
+        mComposingEnd = -1;
+        isSelectMode = false;
+        mHandleMiddleVisible = false;
+        mPendingDeleteStart = -1;
+        mPendingDeleteEnd = -1;
+        spaceWidth = (int) Math.ceil(mTextPaint.measureText(" "));
+        if (spaceWidth <= 0) spaceWidth = 1;
+        clearSyntaxCache();
+        lineWidth = 0;
+        calculateMaxWidth();
+        if (mWordWrap) {
+            computeLineTops();
+        }
+        adjustCursorPosition();
+        onCursorOrSelectionChanged();
+        scrollTo(0, 0);
+        dismissAutoComplete();
+        initialWordScan();
+        recordHistory(0); // Set initial history point
+        requestLayout();
+        postInvalidate();
+        post(new Runnable() {
+            @Override
+            public void run() {
+                clearSyntaxCache();
+                lineWidth = 0;
+                updateLineWidth();
+                adjustCursorPosition();
+                if (isSelectMode) {
+                    updateSelectionHandles();
+                }
+                postInvalidate();
+            }
+        });
+    }
+
+    public Editable getText() {
+        return mGapBuffer;
+    }
+
+    public void setText(String text) {
+        setBuffer(new GapBuffer(text));
+    }
+
+    public String getLine(int lineNumber) {
+        return mGapBuffer.getLine(lineNumber);
+    }
+
+    private int getLineStart(int lineNumber) {
+        return mGapBuffer.getLineOffset(lineNumber);
+    }
+
+    private int getLineEnd(int line) {
+        int nextLine = line + 1;
+        if (nextLine > getLineCount()) {
+            return mGapBuffer.length();
+        }
+        return getLineStart(nextLine) - 1;
+    }
+
+    private int getOffsetLine(int offset) {
+        return mGapBuffer.findLineNumber(offset);
+    }
+
+    public int getLineCount() {
+        return mGapBuffer.getLineCount();
+    }
+
+    public int getLineWidth() {
+        return lineWidth;
+    }
+
+    private int getLineWidth(int lineNumber) {
+        return measureText(getLine(lineNumber));
+    }
+
+    public int getSpaceWidth() {
+        return spaceWidth;
+    }
+
+    public int getColumn() {
+        if (mCursorLine < 1 || mCursorLine > getLineCount()) {
+            return 0;
+        }
+        int lineStart = getLineStart(mCursorLine);
+        return mCursorIndex - lineStart;
+    }
+
+    @Override
+    public boolean onCheckIsTextEditor() {
+        return true;
+    }
+
+    @Override
+    public InputConnection onCreateInputConnection(EditorInfo outAttrs) {
+        outAttrs.inputType = InputType.TYPE_CLASS_TEXT
+                | InputType.TYPE_TEXT_FLAG_MULTI_LINE
+                | InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS;
+        outAttrs.imeOptions = EditorInfo.IME_FLAG_NO_ENTER_ACTION
+                | EditorInfo.IME_ACTION_DONE
+                | EditorInfo.IME_FLAG_NO_EXTRACT_UI;
+        outAttrs.initialSelStart = getSelectionStart();
+        outAttrs.initialSelEnd = getSelectionEnd();
+
+        return new TextInputConnection(this, true);
+    }
+
+    @Override
+    public boolean onKeyDown(int keyCode, KeyEvent event) {
+        if (!isEditedMode) return super.onKeyDown(keyCode, event);
+
+        if (event.getAction() == KeyEvent.ACTION_DOWN) {
+            Log.d(TAG, "onKeyDown: keyCode=" + keyCode + ", unicode=" + event.getUnicodeChar());
+
+            boolean ctrl = event.isCtrlPressed();
+            boolean shift = event.isShiftPressed();
+
+            if (ctrl) {
+                switch (keyCode) {
+                    case KeyEvent.KEYCODE_A:
+                        selectAll();
+                        return true;
+                    case KeyEvent.KEYCODE_C:
+                        if (isSelectMode) copy();
+                        else copyLine();
+                        return true;
+                    case KeyEvent.KEYCODE_X:
+                        if (isSelectMode) cut();
+                        else cutLine();
+                        return true;
+                    case KeyEvent.KEYCODE_V:
+                        paste();
+                        return true;
+                    case KeyEvent.KEYCODE_Z:
+                        if (shift) redo();
+                        else undo();
+                        return true;
+                    case KeyEvent.KEYCODE_Y:
+                        redo();
+                        return true;
+                    case KeyEvent.KEYCODE_D:
+                        duplicateLine();
+                        return true;
+                    case KeyEvent.KEYCODE_L:
+                        if (shift) deleteLine();
+                        else selectSingleLine(mCursorLine);
+                        return true;
+                    case KeyEvent.KEYCODE_SLASH:
+                        toggleComment();
+                        return true;
+                    case KeyEvent.KEYCODE_I:
+                        if (shift) decreaseIndent();
+                        else increaseIndent();
+                        return true;
+                    case KeyEvent.KEYCODE_U:
+                        if (shift) convertSelectionToUpperCase();
+                        else convertSelectionToLowerCase();
+                        return true;
+                }
+            }
+
+            switch (keyCode) {
+                case KeyEvent.KEYCODE_ENTER:
+                case KeyEvent.KEYCODE_NUMPAD_ENTER:
+                    insert("\n");
+                    return true;
+
+                case KeyEvent.KEYCODE_DEL:
+                    if (ctrl) {
+                        int start = findPreviousWordStart(mCursorIndex);
+                        replaceInternal(start, mCursorIndex, "");
+                    } else {
+                        delete();
+                    }
+                    return true;
+
+                case KeyEvent.KEYCODE_FORWARD_DEL:
+                    if (ctrl) {
+                        int end = findNextWordEnd(mCursorIndex);
+                        replaceInternal(mCursorIndex, end, "");
+                    } else {
+                        handleForwardDelete();
+                    }
+                    return true;
+
+                case KeyEvent.KEYCODE_SPACE:
+                    insert(" ");
+                    return true;
+
+                case KeyEvent.KEYCODE_TAB:
+                    if (shift) decreaseIndent();
+                    else insert("\t");
+                    return true;
+
+                case KeyEvent.KEYCODE_DPAD_LEFT:
+                    if (ctrl) moveCursor(8, shift);
+                    else moveCursor(0, shift);
+                    return true;
+
+                case KeyEvent.KEYCODE_DPAD_RIGHT:
+                    if (ctrl) moveCursor(9, shift);
+                    else moveCursor(1, shift);
+                    return true;
+
+                case KeyEvent.KEYCODE_DPAD_UP:
+                    moveCursor(2, shift);
+                    return true;
+
+                case KeyEvent.KEYCODE_DPAD_DOWN:
+                    moveCursor(3, shift);
+                    return true;
+
+                case KeyEvent.KEYCODE_PAGE_UP:
+                    moveCursor(10, shift);
+                    return true;
+
+                case KeyEvent.KEYCODE_PAGE_DOWN:
+                    moveCursor(11, shift);
+                    return true;
+
+                case KeyEvent.KEYCODE_MOVE_HOME:
+                    if (ctrl) moveCursor(6, shift);
+                    else moveCursor(4, shift);
+                    return true;
+
+                case KeyEvent.KEYCODE_MOVE_END:
+                    if (ctrl) moveCursor(7, shift);
+                    else moveCursor(5, shift);
+                    return true;
+            }
+        }
+        return super.onKeyDown(keyCode, event);
+    }
+
+    @Override
+    public boolean onKeyUp(int keyCode, KeyEvent event) {
+        return super.onKeyUp(keyCode, event);
+    }
+
+    public void showSoftInput(boolean show) {
+        if (isEditedMode) {
+            InputMethodManager imm = (InputMethodManager) getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
+            if (show)
+                imm.showSoftInput(this, 0);
+            else
+                imm.hideSoftInputFromWindow(getWindowToken(), 0);
+        }
+    }
+
+    @SuppressLint("ClickableViewAccessibility")
     @Override
     public boolean onTouchEvent(MotionEvent event) {
-        // Reset auto-hide timer on any touch
+        mLastTouchX = event.getX();
+        mLastTouchY = event.getY();
+
+        if (handleFastScrollerTouch(event)) {
+            return true;
+        }
+
         if (event.getAction() == MotionEvent.ACTION_DOWN) {
             requestFocus();
             resetAutoHideTimer();
@@ -728,730 +2511,216 @@ public class EditView extends View {
         return true;
     }
 
-    // Reset clipboard auto-hide timer helper
-    private void resetAutoHideTimer() {
-        if (mClipboardPanel != null && (isSelectMode || mHandleMiddleVisable)) {
-            scheduleAutoHide();
-        }
-    }
+    private boolean handleFastScrollerTouch(MotionEvent event) {
+        int maxScrollY = getMaxScrollY();
+        int maxScrollX = getMaxScrollX();
+        if (maxScrollY <= 0 && maxScrollX <= 0) return false;
 
-    // Handle key down events for editing keys
-    @Override
-    public boolean onKeyDown(int keyCode, KeyEvent event) {
-        if (!isEditedMode) return super.onKeyDown(keyCode, event);
+        float x = event.getX();
+        float y = event.getY();
+        int viewWidth = getWidth();
+        int viewHeight = getHeight();
 
-        // Skip if we're already processing input to avoid duplicates
-        if (mProcessingInput) {
-            Log.d(TAG, "Skipping onKeyDown - processing input");
-            return true;
-        }
+        // Constants matching drawFastScroller
+        int minLength = ScreenUtils.dip2px(getContext(), FAST_SCROLLER_MIN_THUMB_LENGTH_DP);
+        int thicknessNormal = ScreenUtils.dip2px(getContext(), FAST_SCROLLER_THUMB_THICKNESS_DP);
 
-        if (keyCode == KeyEvent.KEYCODE_SHIFT_LEFT ||
-                keyCode == KeyEvent.KEYCODE_SHIFT_RIGHT) {
-            mMetaState |= KeyEvent.META_SHIFT_ON;
-            return true;
-        }
+        switch (event.getAction()) {
+            case MotionEvent.ACTION_DOWN:
+                // Check vertical thumb
+                if (maxScrollY > 0) {
+                    int vTrackHeight = viewHeight - minLength;
+                    int vThumbY = (int) (((float) getScrollY() / maxScrollY) * vTrackHeight);
+                    int vThumbRight = viewWidth;
+                    int vThumbLeft = vThumbRight - thicknessNormal;
 
-        if (keyCode == KeyEvent.KEYCODE_CTRL_LEFT ||
-                keyCode == KeyEvent.KEYCODE_CTRL_RIGHT) {
-            mMetaState |= KeyEvent.META_CTRL_ON;
-            return true;
-        }
+                    // Expand touch area for easier grabbing
+                    int slop = ScreenUtils.dip2px(getContext(), 12);
+                    if (x >= vThumbLeft - slop && x <= vThumbRight + slop && y >= vThumbY && y <= vThumbY + minLength) {
+                        mScroller.abortAnimation();
+                        mIsDraggingFastScroller = true;
+                        mFastScrollerTouchOffset = y - vThumbY;
+                        mLastScrollTimeFast = System.currentTimeMillis();
+                        getParent().requestDisallowInterceptTouchEvent(true);
+                        updateScrollingFromTouch(y);
+                        invalidate();
+                        return true;
+                    }
+                }
+                // Check horizontal thumb
+                if (maxScrollX > 0) {
+                    int hTrackWidth = viewWidth - minLength;
+                    int hThumbX = (int) (((float) getScrollX() / maxScrollX) * hTrackWidth);
+                    int hThumbBottom = viewHeight;
+                    int hThumbTop = hThumbBottom - thicknessNormal;
 
-        if (keyCode == KeyEvent.KEYCODE_ALT_LEFT ||
-                keyCode == KeyEvent.KEYCODE_ALT_RIGHT) {
-            mMetaState |= KeyEvent.META_ALT_ON;
-            return true;
-        }
-
-        if (event.getAction() == KeyEvent.ACTION_DOWN) {
-            Log.d(TAG, "onKeyDown: keyCode=" + keyCode + ", unicode=" + event.getUnicodeChar());
-
-            switch (keyCode) {
-                case KeyEvent.KEYCODE_ENTER:
-                case KeyEvent.KEYCODE_NUMPAD_ENTER:
-                    mProcessingInput = true;
-                    insert("\n");
-                    postDelayed(new Runnable() {
-                        @Override
-                        public void run() {
-                            mProcessingInput = false;
-                        }
-                    }, INPUT_DEBOUNCE_DELAY);
+                    int slop = ScreenUtils.dip2px(getContext(), 12);
+                    if (y >= hThumbTop - slop && y <= hThumbBottom + slop && x >= hThumbX && x <= hThumbX + minLength) {
+                        mScroller.abortAnimation();
+                        mIsDraggingFastScrollerHorizontally = true;
+                        mFastScrollerTouchOffset = x - hThumbX;
+                        mLastScrollTimeFast = System.currentTimeMillis();
+                        getParent().requestDisallowInterceptTouchEvent(true);
+                        updateHorizontalScrollingFromTouch(x);
+                        invalidate();
+                        return true;
+                    }
+                }
+                break;
+            case MotionEvent.ACTION_MOVE:
+                if (mIsDraggingFastScroller) {
+                    mLastScrollTimeFast = System.currentTimeMillis();
+                    updateScrollingFromTouch(y);
+                    invalidate();
                     return true;
-
-                case KeyEvent.KEYCODE_DEL:
-                    mProcessingInput = true;
-                    delete();
-                    postDelayed(new Runnable() {
-                        @Override
-                        public void run() {
-                            mProcessingInput = false;
-                        }
-                    }, INPUT_DEBOUNCE_DELAY);
+                } else if (mIsDraggingFastScrollerHorizontally) {
+                    mLastScrollTimeFast = System.currentTimeMillis();
+                    updateHorizontalScrollingFromTouch(x);
+                    invalidate();
                     return true;
-
-                case KeyEvent.KEYCODE_FORWARD_DEL:
-                    mProcessingInput = true;
-                    handleForwardDelete();
-                    postDelayed(new Runnable() {
-                        @Override
-                        public void run() {
-                            mProcessingInput = false;
-                        }
-                    }, INPUT_DEBOUNCE_DELAY);
+                }
+                break;
+            case MotionEvent.ACTION_UP:
+            case MotionEvent.ACTION_CANCEL:
+                if (mIsDraggingFastScroller || mIsDraggingFastScrollerHorizontally) {
+                    mIsDraggingFastScroller = false;
+                    mIsDraggingFastScrollerHorizontally = false;
+                    mLastScrollTimeFast = System.currentTimeMillis();
+                    invalidate();
                     return true;
-
-                case KeyEvent.KEYCODE_SPACE:
-                    mProcessingInput = true;
-                    insert(" ");
-                    postDelayed(new Runnable() {
-                        @Override
-                        public void run() {
-                            mProcessingInput = false;
-                        }
-                    }, INPUT_DEBOUNCE_DELAY);
-                    return true;
-
-                case KeyEvent.KEYCODE_TAB:
-                    mProcessingInput = true;
-                    insert("\t");
-                    postDelayed(new Runnable() {
-                        @Override
-                        public void run() {
-                            mProcessingInput = false;
-                        }
-                    }, INPUT_DEBOUNCE_DELAY);
-                    return true;
-
-                // Let the input connection handle these to avoid duplicates
-                case KeyEvent.KEYCODE_0:
-                case KeyEvent.KEYCODE_1:
-                case KeyEvent.KEYCODE_2:
-                case KeyEvent.KEYCODE_3:
-                case KeyEvent.KEYCODE_4:
-                case KeyEvent.KEYCODE_5:
-                case KeyEvent.KEYCODE_6:
-                case KeyEvent.KEYCODE_7:
-                case KeyEvent.KEYCODE_8:
-                case KeyEvent.KEYCODE_9:
-                case KeyEvent.KEYCODE_NUMPAD_0:
-                case KeyEvent.KEYCODE_NUMPAD_1:
-                case KeyEvent.KEYCODE_NUMPAD_2:
-                case KeyEvent.KEYCODE_NUMPAD_3:
-                case KeyEvent.KEYCODE_NUMPAD_4:
-                case KeyEvent.KEYCODE_NUMPAD_5:
-                case KeyEvent.KEYCODE_NUMPAD_6:
-                case KeyEvent.KEYCODE_NUMPAD_7:
-                case KeyEvent.KEYCODE_NUMPAD_8:
-                case KeyEvent.KEYCODE_NUMPAD_9:
-                    return false; // Let input connection handle via commitText
-
-                default:
-                    // For other keys, let the input connection handle them
-                    return false;
-            }
+                }
+                break;
         }
-        return super.onKeyDown(keyCode, event);
+        return false;
     }
 
-    // Handle key up events for modifier keys
-    @Override
-    public boolean onKeyUp(int keyCode, KeyEvent event) {
-        if (keyCode == KeyEvent.KEYCODE_SHIFT_LEFT ||
-                keyCode == KeyEvent.KEYCODE_SHIFT_RIGHT) {
-            mMetaState &= ~KeyEvent.META_SHIFT_ON;
-            return true;
-        }
+    private void updateScrollingFromTouch(float touchY) {
+        int viewHeight = getHeight();
+        int maxScrollY = getMaxScrollY();
 
-        if (keyCode == KeyEvent.KEYCODE_CTRL_LEFT ||
-                keyCode == KeyEvent.KEYCODE_CTRL_RIGHT) {
-            mMetaState &= ~KeyEvent.META_CTRL_ON;
-            return true;
-        }
+        int thumbHeight = ScreenUtils.dip2px(getContext(), FAST_SCROLLER_MIN_THUMB_LENGTH_DP);
 
-        if (keyCode == KeyEvent.KEYCODE_ALT_LEFT ||
-                keyCode == KeyEvent.KEYCODE_ALT_RIGHT) {
-            mMetaState &= ~KeyEvent.META_ALT_ON;
-            return true;
-        }
+        float trackHeight = viewHeight - thumbHeight;
+        float progress = (touchY - mFastScrollerTouchOffset) / trackHeight;
+        if (progress < 0) progress = 0;
+        if (progress > 1) progress = 1;
 
-        return super.onKeyUp(keyCode, event);
+        int newScrollY = (int) (progress * maxScrollY);
+        scrollTo(getScrollX(), newScrollY);
     }
 
-    // Create input connection for IME
-    @Override
-    public InputConnection onCreateInputConnection(EditorInfo outAttrs) {
-        // TODO: Implement this method
-        outAttrs.inputType = InputType.TYPE_CLASS_TEXT
-                | InputType.TYPE_TEXT_FLAG_MULTI_LINE;
-        outAttrs.imeOptions = EditorInfo.IME_FLAG_NO_ENTER_ACTION
-                | EditorInfo.IME_ACTION_DONE
-                | EditorInfo.IME_FLAG_NO_EXTRACT_UI;
+    private void updateHorizontalScrollingFromTouch(float touchX) {
+        int viewWidth = getWidth();
+        int maxScrollX = getMaxScrollX();
 
-        return new TextInputConnection(this, true);
+        int thumbWidth = ScreenUtils.dip2px(getContext(), FAST_SCROLLER_MIN_THUMB_LENGTH_DP);
+
+        float trackWidth = viewWidth - thumbWidth;
+        float progress = (touchX - mFastScrollerTouchOffset) / trackWidth;
+        if (progress < 0) progress = 0;
+        if (progress > 1) progress = 1;
+
+        int newScrollX = (int) (progress * maxScrollX);
+        scrollTo(newScrollX, getScrollY());
     }
 
-    // Toggle software keyboard
-    public void showSoftInput(boolean show) {
-        if (isEditedMode) {
-            InputMethodManager imm = (InputMethodManager) getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
-            if (show)
-                imm.showSoftInput(this, 0);
-            else
-                imm.hideSoftInputFromWindow(getWindowToken(), 0);
+    private boolean onMove() {
+        if (mGapBuffer == null || mGapBuffer.length() == 0) {
+            return false;
         }
-    }
+        int viewWidth = getWidth();
+        int viewHeight = getHeight();
 
-    // ---------- Text and Buffer Operations ----------
-    // Set an external buffer
-    public void setBuffer(GapBuffer buffer) {
-        mGapBuffer = buffer;
-        clearSyntaxCache();
-        dismissAutoComplete();
-        invalidate();
-    }
+        // Use raw touch coordinates for edge detection
+        float touchX = mLastTouchX;
+        float touchY = mLastTouchY;
 
-    // Get current buffer
-    public GapBuffer getBuffer() {
-        return this.mGapBuffer;
-    }
-
-    // Set text directly
-    public void setText(String text) {
-        mGapBuffer = new GapBuffer(text);
-        clearSyntaxCache();
-        dismissAutoComplete();
-        invalidate();
-    }
-
-    // Set font size in px with bounds and adjust scroll to keep relative position
-    public void setTextSize(float px) {
-        float min = ScreenUtils.dip2px(getContext(), 10);
-        float max = ScreenUtils.dip2px(getContext(), 30);
-
-        if (px < min) px = min;
-        if (px > max) px = max;
-
-        if (px == mTextPaint.getTextSize()) return;
-
-        int currentScrollY = getScrollY();
-        int currentLine = Math.max(1, currentScrollY / getLineHeight());
-        float lineFraction = (float) (currentScrollY % getLineHeight()) / getLineHeight();
-
-        mTextPaint.setTextSize(px);
-
-        adjustCursorPosition();
-        if (isSelectMode) {
-            adjustSelectRange(selectionStart, selectionEnd);
+        int dx = 0;
+        // Gradual horizontal speed
+        int slopX = spaceWidth * 4;
+        float speedX = spaceWidth * (0.5f + mAutoScrollFactor);
+        if (touchX <= slopX) {
+            dx = (int) -speedX;
+        } else if (touchX >= viewWidth - slopX) {
+            dx = (int) speedX;
         }
 
-        // Update magnifier position if active
-        if (mIsMagnifierShowing && mMagnifierEnabled) {
-            // updateMagnifier(mCursorPosX, mCursorPosY + getLineHeight());
+        int dy = 0;
+        //  gradual vertical scroll
+        int slopY = getLineHeight();
+        float speedY = getLineHeight() * (0.2f + mAutoScrollFactor * 0.4f);
+        if (touchY <= slopY) {
+            dy = (int) -speedY;
+        } else if (touchY >= viewHeight - slopY) {
+            dy = (int) speedY;
         }
 
-        int newLineHeight = getLineHeight();
-        int newScrollY = (int) (currentLine * newLineHeight + lineFraction * newLineHeight);
-        newScrollY = Math.max(0, Math.min(newScrollY, getMaxScrollY()));
-        int newScrollX = getScrollX();
+        if (dx == 0 && dy == 0) {
+            return false;
+        }
+
+        int oldX = getScrollX();
+        int oldY = getScrollY();
+        int newScrollX = Math.max(0, Math.min(oldX + dx, getMaxScrollX()));
+        int newScrollY = Math.max(0, Math.min(oldY + dy, getMaxScrollY()));
+
+        if (newScrollX == oldX && newScrollY == oldY) {
+            return false;
+        }
+
+        if (mAutoScrollFactor > 0.8f && mIsMagnifierShowing) {
+            dismissMagnifier();
+        }
 
         scrollTo(newScrollX, newScrollY);
-        postInvalidate();
-    }
 
-    // Toggle edit mode
-    public void setEditedMode(boolean editMode) {
-        isEditedMode = editMode;
-    }
+        // Update selection while scrolling if a handle is held
+        if (mGestureListener != null && (mGestureListener.touchOnSelectHandleMiddle ||
+                mGestureListener.touchOnSelectHandleLeft ||
+                mGestureListener.touchOnSelectHandleRight)) {
 
-    // Get edit mode
-    public boolean getEditedMode() {
-        return isEditedMode;
-    }
+            float contentX = touchX + newScrollX;
+            float contentY = touchY + newScrollY;
 
-    // Set typeface
-    public void setTypeface(Typeface typeface) {
-        mTextPaint.setTypeface(typeface);
-    }
+            // Follow onScroll logic for Y offset
+            float adjustedY = contentY - getLineHeight() - (float) Math.min(getLineHeight(), selectHandleHeight) / 2;
 
-    // Set listener for text change
-    public void setOnTextChangedListener(OnTextChangedListener listener) {
-        mTextListener = listener;
-    }
+            setCursorPosition(contentX, adjustedY);
 
-    // Return left padding + line number width
-
-    public int getLeftSpace() {
-        int lineNumberWidth = getLineNumberWidth();
-        int separatorWidth = 2;
-        int contentPadding = 10;
-
-        return getPaddingLeft() + lineNumberWidth + SPACEING * 2 + separatorWidth + contentPadding;
-    }
-
-    // Measure text width
-    public int measureText(String text) {
-        return (int) Math.ceil(mTextPaint.measureText(text));
-    }
-
-    // Get single line height in px
-    public int getLineHeight() {
-        TextPaint.FontMetricsInt metrics = mTextPaint.getFontMetricsInt();
-        return metrics.bottom - metrics.top;
-    }
-
-    // Get the start offset of a line
-    private int getLineStart(int lineNumber) {
-        return mGapBuffer.getLineOffset(lineNumber);
-    }
-
-    // Get the last line offset of a line
-    private int getLineEnd(int line) {
-        int nextLine = line + 1;
-
-        if (nextLine > getLineCount()) {
-            // last line → return end of buffer
-            return mGapBuffer.length();
+            if (mGestureListener.touchOnSelectHandleLeft) {
+                selectHandleLeftX = mCursorPosX;
+                selectHandleLeftY = mCursorPosY + getLineHeight();
+                setSelection(mCursorIndex, getSelectionEnd());
+            } else if (mGestureListener.touchOnSelectHandleRight) {
+                selectHandleRightX = mCursorPosX;
+                selectHandleRightY = mCursorPosY + getLineHeight();
+                setSelection(getSelectionStart(), mCursorIndex);
+            }
+            postInvalidate();
         }
 
-        return getLineStart(nextLine) - 1; // end before newline
+        return true;
     }
 
-    // Find which line an offset is on
-    private int getOffsetLine(int offset) {
-        return mGapBuffer.findLineNumber(offset);
-    }
-
-    // Get text size px
-    public float getTextSize() {
-        return mTextPaint.getTextSize();
-    }
-
-    // Get number of lines
-    public int getLineCount() {
-        return mGapBuffer.getLineCount();
-    }
-
-    // Width needed to draw line numbers
-    private int getLineNumberWidth() {
-        return measureText(Integer.toString(getLineCount()));
-    }
-
-    // get the column where the cursor is placed
-    public int getColumn() {
-        if (mCursorLine < 1 || mCursorLine > getLineCount()) {
-            return 0;
-        }
-        int lineStart = getLineStart(mCursorLine);
-        return mCursorIndex - lineStart;
-    }
-
-    // Helper used by clipboard panel to show selection
-    public void selectText(boolean enable) {
-        if (!enable) clearSelectionMenu();
-    }
-
-    // Get bounding box for caret at index (for popup positioning)
-    public Rect getBoundingBox(int index) {
-        int left = getLeftSpace();
-        int line = getOffsetLine(index);
-        int lineStart = getLineStart(line);
-        String text = mGapBuffer.substring(lineStart, Math.min(index, mGapBuffer.length()));
-        int x = left + measureText(text);
-        int y = (line - 1) * getLineHeight();
-
-        // Translate for scroll and padding
-        int viewX = x - getScrollX() + getPaddingLeft();
-        int viewY = y - getScrollY() + getPaddingTop();
-
-        // Make sure panel appears above caret line
-        return new Rect(viewX, viewY - getLineHeight() * 2, viewX + getLineHeight(), viewY);
-    }
-
-    // Get caret index
-    public int getCaretPosition() {
-        return mCursorIndex;
-    }
-
-    // Get selected text string
-    public String getSelectedText() {
-        if (isSelectMode && selectionStart < selectionEnd) {
-            return mGapBuffer.substring(selectionStart, selectionEnd);
-        }
-        return "";
-    }
-
-    // Getting the selected text length
-    public int getSelectionLength() {
-        if (!isSelectMode) return 0;
-        return selectionEnd - selectionStart;
-    }
-
-    // Insert text at caret, with auto-indent, autocomplete, and blinking handling
-    public void insertText(String text) {
-        if (text == null || text.isEmpty()) return;
-
-        int insertAt = mCursorIndex;
-
-        // If selection exists → replace it
-        if (isSelectMode && selectionStart != selectionEnd) {
-
-            int s = Math.min(selectionStart, selectionEnd);
-            int e = Math.max(selectionStart, selectionEnd);
-
-            mGapBuffer.beginBatchEdit();
-            mGapBuffer.markSelectionBefore(selectionStart, selectionEnd, true);
-
-            // Replace selection in one undo-able step
-            mGapBuffer.replace(s, e, text, true);
-
-            // Set new cursor after inserted text
-            insertAt = s + text.length();
-            isSelectMode = false;
-            selectionStart = selectionEnd = -1;
-
-            mGapBuffer.markSelectionAfter(insertAt, insertAt, false);
-            mGapBuffer.endBatchEdit();
-
+    private void performHapticFeedback() {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O_MR1) {
+            performHapticFeedback(HapticFeedbackConstants.TEXT_HANDLE_MOVE);
         } else {
-
-            // No selection → simple insert with undo snapshot
-            mGapBuffer.beginBatchEdit();
-            mGapBuffer.markSelectionBefore(mCursorIndex, mCursorIndex, false);
-
-            mGapBuffer.insert(mCursorIndex, text, true);
-            insertAt = mCursorIndex + text.length();
-
-            mGapBuffer.markSelectionAfter(insertAt, insertAt, false);
-            mGapBuffer.endBatchEdit();
+            performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
         }
+    }
 
-        mCursorIndex = insertAt;
-        mCursorLine = getOffsetLine(mCursorIndex);
-
-        adjustCursorPosition();
-        scrollToVisable();
+    private void resetAutoHideTimer() {
+        mHideSelectHandles = false;
+        if (!isSelectMode) {
+            mHandleMiddleVisible = true;
+        }
+        scheduleAutoHide();
         postInvalidate();
     }
 
-    // Selection getters
-    public int getSelectionStart() {
-        return selectionStart;
-    }
-
-    public int getSelectionEnd() {
-        return selectionEnd;
-    }
-
-    // Delete selected text if in selection mode
-    public void deleteSelectedText() {
-        if (isSelectMode && selectionStart < selectionEnd) {
-            mGapBuffer.delete(selectionStart, selectionEnd, true);
-            mCursorIndex = selectionStart;
-            isSelectMode = false;
-            adjustCursorPosition();
-            scrollToVisable();
-            dismissAutoComplete();
-            postDelayed(mWordUpdateRunnable, WORD_UPDATE_DELAY);
-            postInvalidate();
-        }
-    }
-
-    // Select word at caret
-    public void selectWordAtCursor() {
-        if (mGapBuffer.length() == 0) return;
-
-        int start = mCursorIndex;
-        int end = mCursorIndex;
-
-        // Find word start
-        while (start > 0 && Character.isJavaIdentifierPart(mGapBuffer.charAt(start - 1))) {
-            start--;
-        }
-
-        // Find word end
-        while (end < mGapBuffer.length() && Character.isJavaIdentifierPart(mGapBuffer.charAt(end))) {
-            end++;
-        }
-
-        if (start < end) {
-            selectionStart = start;
-            selectionEnd = end;
-            isSelectMode = true;
-            adjustSelectRange(start, end);
-            postInvalidate();
-        }
-    }
-
-    // Move caret to next word start
-    public void moveToNextWord() {
-        if (mCursorIndex >= mGapBuffer.length()) return;
-
-        int newPos = mCursorIndex;
-
-        // Skip current word if we're in one
-        while (newPos < mGapBuffer.length() && Character.isJavaIdentifierPart(mGapBuffer.charAt(newPos))) {
-            newPos++;
-        }
-
-        // Skip non-word characters
-        while (newPos < mGapBuffer.length() && !Character.isJavaIdentifierPart(mGapBuffer.charAt(newPos))) {
-            newPos++;
-        }
-
-        setCursorPosition(newPos);
-        scrollToVisable();
-        postInvalidate();
-    }
-
-    // Move caret to previous word start
-    public void moveToPreviousWord() {
-        if (mCursorIndex <= 0) return;
-
-        int newPos = mCursorIndex - 1;
-
-        // Skip non-word characters backwards
-        while (newPos > 0 && !Character.isJavaIdentifierPart(mGapBuffer.charAt(newPos))) {
-            newPos--;
-        }
-
-        // Skip word characters backwards
-        while (newPos > 0 && Character.isJavaIdentifierPart(mGapBuffer.charAt(newPos - 1))) {
-            newPos--;
-        }
-
-        setCursorPosition(newPos);
-        scrollToVisable();
-        postInvalidate();
-    }
-
-    // Select all text
-    public void selectAll() {
-        removeCallbacks(blinkAction);
-        mCursorVisiable = false;
-        mHandleMiddleVisable = false; // ← CHANGE TO FALSE
-        isSelectMode = true;
-
-        // at first index
-        selectionStart = 0;
-        // at last index
-        selectionEnd = mGapBuffer.length();
-
-        // set handle left at first position
-        selectHandleLeftX = getLeftSpace();
-        selectHandleLeftY = getLineHeight();
-
-        // set handle right at last position
-        selectHandleRightX = getLeftSpace() + getLineWidth(getLineCount());
-        selectHandleRightY = getLineCount() * getLineHeight();
-
-        // set cursor index and position
-        setCursorPosition(selectionEnd);
-
-        if (!mReplaceList.isEmpty())
-            mReplaceList.clear();
-        smoothScrollTo(0, Math.max(getLineCount() * getLineHeight() - getHeight() + getLineHeight() * 2, 0));
-        showTextSelectionWindow();
-        postInvalidate();
-    }
-
-    // Helper method to check if all texts are selected
-    public boolean isAllTextSelected() {
-        return selectionStart == 0 &&
-                selectionEnd == mGapBuffer.length() &&
-                selectionStart != selectionEnd &&
-                mGapBuffer.length() > 0;
-    }
-
-    // Clear selection and related UI
-    public void clearSelectionMenu() {
-        isSelectMode = false;
-        mHandleMiddleVisable = false;
-        mIsLineSelectionMode = false;
-        mStartSelectionLine = -1;
-        mEndSelectionLine = -1;
-        mFirstSelectedLine = -1;
-        mSecondSelectedLine = -1;
-        mWaitingForSecondSelection = false;
-        mSelectionHandler.removeCallbacks(mClearSelectionRunnable);
-        dismissAutoComplete();
-        onCursorOrSelectionChanged();
-        postInvalidate();
-    }
-
-    // Check selection mode
-    public boolean isSelectMode() {
-        return isSelectMode;
-    }
-
-    // Check if focused on line number area
-    private boolean isInLineNumberArea(float x, float y) {
-        int lineNumberWidth = getLineNumberWidth() + SPACEING * 2;
-        return x >= getPaddingLeft() && x <= getPaddingLeft() + lineNumberWidth;
-    }
-
-    // Get line from Y dir.
-    private int getLineFromY(float y) {
-        int line = (int) (y / getLineHeight()) + 1;
-        return Math.max(1, Math.min(line, getLineCount()));
-    }
-
-    // Get raw line string
-    public String getLine(int lineNumber) {
-        return mGapBuffer.getLine(lineNumber);
-    }
-
-    // Width of specified line text
-    private int getLineWidth(int lineNumber) {
-        return measureText(getLine(lineNumber));
-    }
-
-    // Width of lines
-    public int getLineWidth() {
-        return lineWidth;
-    }
-
-    // Width of space
-    public int getSpaceWidth() {
-        return spaceWidth;
-    }
-
-    // Get maximum scrollable X
-    public int getMaxScrollX() {
-        return Math.max(0, getLeftSpace() + lineWidth + spaceWidth * 4 - getWidth());
-    }
-
-    // Get maximum scrollable Y
-    public int getMaxScrollY() {
-        return Math.max(0, (getLineCount() + 2) * getLineHeight() - getHeight());
-    }
-
-    // ---------- Magnifier ----------
-    // Enable or disable magnifier usage, only for Android 8+
-    public void setMagnifierEnabled(boolean enabled) {
-        mMagnifierEnabled = enabled;
-        if (!enabled && mIsMagnifierShowing) {
-            dismissMagnifier();
-        }
-    }
-
-    // Check magnifier enabled
-    public boolean isMagnifierEnabled() {
-        return mMagnifierEnabled;
-    }
-
-    // Show magnifier centered near content coords
-    private void showMagnifier(float x, float y) {
-        if (!mMagnifierEnabled || mMagnifier == null) return;
-        try {
-            hideTextSelectionWindow();
-            // Convert content coordinates to screen coordinates
-            float adjustedX = x - getScrollX();
-            float adjustedY = y - getScrollY();
-
-            // Adjust Y to center magnifier on the current line's text
-            float lineHeight = getLineHeight();
-            adjustedY -= lineHeight * 0.5f; // Center on the current line (baseline)
-
-            // Account for padding and canvas translation
-            adjustedY += getPaddingTop();
-
-            // Ensure magnifier stays within view bounds
-            adjustedX = Math.max(50, Math.min(adjustedX, getWidth() - 50));
-            adjustedY = Math.max(50, Math.min(adjustedY, getHeight() - 50));
-
-            // Debug logging
-            Log.d(TAG, "showMagnifier: x=" + adjustedX + ", y=" + adjustedY + ", rawX=" + x + ", rawY=" + y + ", scrollY=" + getScrollY() + ", lineHeight=" + lineHeight);
-
-            mMagnifier.show((int) adjustedX, (int) adjustedY);
-            mMagnifierX = adjustedX;
-            mMagnifierY = adjustedY;
-            mIsMagnifierShowing = true;
-        } catch (Exception e) {
-            Log.e(TAG, "Error showing magnifier: " + e.getMessage());
-            dismissMagnifier();
-        }
-    }
-
-    // Update magnifier position smoothly
-    private void updateMagnifier(float x, float y) {
-        if (!mIsMagnifierShowing || !mMagnifierEnabled || mMagnifier == null) return;
-        try {
-            // Convert content coordinates to screen coordinates
-            float adjustedX = x - getScrollX();
-            float adjustedY = y - getScrollY();
-
-            // Adjust Y to center magnifier on the current line's text
-            float lineHeight = getLineHeight();
-            adjustedY -= lineHeight * 0.5f; // Center on the current line (baseline)
-
-            // Account for padding and canvas translation
-            adjustedY += getPaddingTop();
-
-            // Ensure magnifier stays within view bounds
-            adjustedX = Math.max(50, Math.min(adjustedX, getWidth() - 50));
-            adjustedY = Math.max(50, Math.min(adjustedY, getHeight() - 50));
-
-            // Smooth update only if significant movement
-            if (Math.abs(adjustedX - mMagnifierX) > 1 || Math.abs(adjustedY - mMagnifierY) > 1) {
-                Log.d(TAG, "updateMagnifier: x=" + adjustedX + ", y=" + adjustedY + ", rawX=" + x + ", rawY=" + y + ", scrollY=" + getScrollY() + ", lineHeight=" + lineHeight);
-
-                mMagnifier.show((int) adjustedX, (int) adjustedY);
-                mMagnifierX = adjustedX;
-                mMagnifierY = adjustedY;
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Error updating magnifier: " + e.getMessage());
-            dismissMagnifier();
-        }
-    }
-
-    // Dismiss magnifier if visible
-    private void dismissMagnifier() {
-        if (mIsMagnifierShowing && mMagnifier != null) {
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
-                try {
-                    mMagnifier.dismiss();
-                    mIsMagnifierShowing = false;
-                } catch (Exception e) {
-                    Log.e(TAG, "Error dismissing magnifier: " + e.getMessage());
-                }
-            }
-        }
-    }
-
-    // Syntax Helpers
-    public void setSyntaxLanguageFileName(String languageFile) {
-        mHighlighter = new MHSyntaxHighlightEngine(getContext(), mTextPaint, languageFile, isSyntaxDarkMode);
-    }
-
-    // Syntax dark mode helper
-    public void setSyntaxDarkMode(boolean isDark) {
-        isSyntaxDarkMode = isDark;
-    }
-
-    // Get syntax comment block of exists
-    public String getCommentBlock() {
-        String block = mHighlighter.getCommentSyntaxBlock();
-        if (block == null) return "";
-        return block;
-    }
-
-    public void setMenuStyle(ClipboardPanel.MenuDisplayMode mode) {
-        mClipboardPanel.setMenuDisplayMode(mode);
-    }
-
-    // ---------- Scrolling Helpers ----------
-    /**
-     * Like {@link View#scrollBy}, but scroll smoothly instead of immediately.
-     *
-     * @param dx the number of pixels to scroll by on the X axis
-     * @param dy the number of pixels to scroll by on the Y axis
-     */
     public final void smoothScrollBy(int dx, int dy) {
         if (getHeight() == 0) {
-            // Nothing to do.
             return;
         }
         long duration = AnimationUtils.currentAnimationTimeMillis() - mLastScroll;
@@ -1467,17 +2736,10 @@ public class EditView extends View {
         mLastScroll = AnimationUtils.currentAnimationTimeMillis();
     }
 
-    /**
-     * Like {@link #scrollTo}, but scroll smoothly instead of immediately.
-     *
-     * @param x the position where to scroll on the X axis
-     * @param y the position where to scroll on the Y axis
-     */
     public final void smoothScrollTo(int x, int y) {
         smoothScrollBy(x - getScrollX(), y - getScrollY());
     }
 
-    // Compute fling/scroll animation progress
     @Override
     public void computeScroll() {
         super.computeScroll();
@@ -1487,278 +2749,2110 @@ public class EditView extends View {
         }
     }
 
-    // Scroll to ensure caret is visible with margins
-    private void scrollToVisable() {
-        // Only scroll if cursor is significantly out of view
+    @Override
+    protected void onScrollChanged(int l, int t, int oldl, int oldt) {
+        super.onScrollChanged(l, t, oldl, oldt);
+        mLastScrollTimeFast = System.currentTimeMillis();
+
+        // Refresh search highlights for the newly visible area
+        if (mLastSearchPattern != null && !mLastSearchPattern.isEmpty()) {
+            find(mLastSearchPattern);
+        }
+
+        postInvalidate();
+    }
+
+    @Override
+    public void scrollTo(int x, int y) {
+        int scrollX = x;
+        int scrollY = y;
+        int maxX = getMaxScrollX();
+        int maxY = getMaxScrollY();
+        if (scrollX < 0) scrollX = 0;
+        if (scrollX > maxX) scrollX = maxX;
+        if (scrollY < 0) scrollY = 0;
+        if (scrollY > maxY) scrollY = maxY;
+        super.scrollTo(scrollX, scrollY);
+    }
+
+    private void scrollToVisible() {
         int dx = 0;
-        int leftMargin = spaceWidth * 3;
-        int rightMargin = screenWidth - spaceWidth * 2;
+        int leftMargin = spaceWidth * 6;
+        int rightMargin = getWidth() - spaceWidth * 4;
 
         if (mCursorPosX - getScrollX() < leftMargin) {
             dx = mCursorPosX - getScrollX() - leftMargin;
         } else if (mCursorPosX - getScrollX() > rightMargin) {
             dx = mCursorPosX - getScrollX() - rightMargin;
         }
-
         int dy = 0;
         int topMargin = getLineHeight();
-        int bottomMargin = getHeight() - getLineHeight();
+        int bottomMargin = getHeight() - getLineHeight() * 2; // Keep at least one extra line height buffer
 
-        if (mCursorPosY - getScrollY() < topMargin) {
+        if (mCursorLine > 1 && mCursorPosY - getScrollY() < topMargin) {
             dy = mCursorPosY - getScrollY() - topMargin;
+        } else if (mCursorLine == 1 && getScrollY() > 0) {
+            dy = -getScrollY();
         } else if (mCursorPosY - getScrollY() > bottomMargin) {
             dy = mCursorPosY - getScrollY() - bottomMargin;
         }
 
-        // Only scroll if necessary
         if (dx != 0 || dy != 0) {
             smoothScrollBy(dx, dy);
         }
     }
 
-    // ---------- Syntax / Highlights ----------
-    // Clear syntax highlight cache
-    private void clearSyntaxCache() {
-        if (mHighlighter != null) {
-            mHighlighter.clearCache();
+    public boolean canGoBack() {
+        return mHistoryIndex > 0;
+    }
+
+    public boolean canGoForward() {
+        return mHistoryIndex < mCursorHistory.size() - 1;
+    }
+
+    public void goBack() {
+        if (canGoBack()) {
+            mIsNavigatingHistory = true;
+            mHistoryIndex--;
+            int index = mCursorHistory.get(mHistoryIndex);
+            setSelection(index, index);
+            mIsNavigatingHistory = false;
+            scrollToVisible();
         }
     }
 
-    // Call this method whenever the text content changes
-    public void onTextChanged() {
-        clearSyntaxCache(); // keep cache fresh
-        mTextListener.onTextChanged();
+    public void goForward() {
+        if (canGoForward()) {
+            mIsNavigatingHistory = true;
+            mHistoryIndex++;
+            int index = mCursorHistory.get(mHistoryIndex);
+            setSelection(index, index);
+            mIsNavigatingHistory = false;
+            scrollToVisible();
+        }
     }
 
-    // ---------- Insert / Delete with handling ----------
-    // Insert text with auto-indent, autocomplete and selection handling
-    private void insert(String text) {
-        if (!isEditedMode) return; // nothing to do
+    public void recordHistory() {
+        recordHistory(mCursorIndex);
+    }
+
+    private void recordHistory(int index) {
+        if (mIsNavigatingHistory || mGapBuffer == null) return;
+
+        // Don't record if it's the same position as current history point
+        if (mHistoryIndex >= 0 && mCursorHistory.get(mHistoryIndex) == index) return;
+
+        // Truncate future
+        while (mCursorHistory.size() > mHistoryIndex + 1) {
+            mCursorHistory.remove(mCursorHistory.size() - 1);
+        }
+
+        mCursorHistory.add(index);
+        mHistoryIndex++;
+
+        if (mCursorHistory.size() > 100) {
+            mCursorHistory.remove(0);
+            mHistoryIndex--;
+        }
+    }
+
+    public void gotoLine(int lineIndex) {
+        recordHistory(); // Record where we are BEFORE jump
+        int line = Math.min(Math.max(lineIndex, 1), getLineCount());
         if (isSelectMode) {
-            mGapBuffer.beginBatchEdit();
-            delete();
+            clearSelectionMenu();
+        }
+        mCursorIndex = getLineStart(line);
+        mCursorLine = line;
+        mCursorPosX = getLeftSpace();
+        mCursorPosY = getLineTop(line);
+
+        recordHistory(); // Record new position
+
+        smoothScrollTo(0, Math.max(getLineBottom(line) - getHeight() + getLineHeight() * 2, 0));
+        postInvalidate();
+    }
+
+    private void moveCursor(int direction, boolean extendSelection) {
+        int oldCursor = mCursorIndex;
+        int newCursor = oldCursor;
+        int len = mGapBuffer.length();
+
+        switch (direction) {
+            case 0: // Left
+                if (newCursor > 0) newCursor--;
+                break;
+            case 1: // Right
+                if (newCursor < len) newCursor++;
+                break;
+            case 2: // Up
+                int upLine = mCursorLine - 1;
+                if (upLine >= 1) {
+                    setCursorPosition(mCursorPosX + getPaddingLeft(), getLineTop(upLine) + (float) getLineHeight() / 2 + getPaddingTop());
+                    newCursor = mCursorIndex;
+                } else {
+                    newCursor = 0;
+                }
+                break;
+            case 3: // Down
+                int downLine = mCursorLine + 1;
+                if (downLine <= getLineCount()) {
+                    setCursorPosition(mCursorPosX + getPaddingLeft(), getLineTop(downLine) + (float) getLineHeight() / 2 + getPaddingTop());
+                    newCursor = mCursorIndex;
+                } else {
+                    newCursor = len;
+                }
+                break;
+            case 4: // Home
+                newCursor = getLineStart(mCursorLine);
+                break;
+            case 5: // End
+                newCursor = getLineEnd(mCursorLine);
+                break;
+            case 6: // Document Home
+                newCursor = 0;
+                break;
+            case 7: // Document End
+                newCursor = len;
+                break;
+            case 8: // Word Left
+                newCursor = findPreviousWordStart(newCursor);
+                break;
+            case 9: // Word Right
+                newCursor = findNextWordEnd(newCursor);
+                break;
+            case 10: // Page Up
+            case 11: // Page Down
+                int pageLines = getHeight() / getLineHeight();
+                if (pageLines <= 0) pageLines = 10;
+                int targetLine = (direction == 10) ? mCursorLine - pageLines : mCursorLine + pageLines;
+                targetLine = Math.max(1, Math.min(targetLine, getLineCount()));
+                setCursorPosition(mCursorPosX + getPaddingLeft(), getLineTop(targetLine) + (float) getLineHeight() / 2 + getPaddingTop());
+                newCursor = mCursorIndex;
+                break;
         }
 
-        if (text.equals("\n") && mAutoIndentEnabled) {
-            String indent = getAutoIndent();
-            if (!indent.isEmpty()) {
-                text = "\n" + indent;
-            }
-        }
-
-        removeCallbacks(blinkAction);
-        mCursorVisiable = true;
-        mHandleMiddleVisable = false;
-
-        mCurrentPrefix = getCurrentPrefix();
-
-        mGapBuffer.insert(mCursorIndex, text, true);
-
-        // Handle auto-complete
-        if (!text.trim().isEmpty()) {
-            if (!mCurrentPrefix.isEmpty()) {
-                Log.d(TAG, "Prefix: " + mCurrentPrefix);
-                filterAndShowSuggestions(mCurrentPrefix + text);
+        if (extendSelection) {
+            int selStart = Selection.getSelectionStart(mGapBuffer);
+            int selEnd = Selection.getSelectionEnd(mGapBuffer);
+            if (selStart < 0 || selEnd < 0) {
+                setSelection(oldCursor, newCursor);
             } else {
-                dismissAutoComplete();
+                int anchor = (selStart == oldCursor) ? selEnd : selStart;
+                setSelection(anchor, newCursor);
             }
         } else {
-            dismissAutoComplete();
+            setSelection(newCursor, newCursor);
+        }
+        scrollToVisible();
+        postInvalidate();
+    }
+
+    private int findPreviousWordStart(int index) {
+        int i = index;
+        if (i <= 0) return 0;
+        i--;
+        // Skip whitespace
+        while (i > 0 && Character.isWhitespace(mGapBuffer.charAt(i))) {
+            i--;
+        }
+        // Skip word characters
+        while (i > 0 && !Character.isWhitespace(mGapBuffer.charAt(i - 1))) {
+            i--;
+        }
+        return i;
+    }
+
+    private int findNextWordEnd(int index) {
+        int i = index;
+        int len = mGapBuffer.length();
+        if (i >= len) return len;
+        // Skip whitespace
+        while (i < len && Character.isWhitespace(mGapBuffer.charAt(i))) {
+            i++;
+        }
+        // Skip word characters
+        while (i < len && !Character.isWhitespace(mGapBuffer.charAt(i))) {
+            i++;
+        }
+        return i;
+    }
+
+    private void setCursorPosition(int index) {
+        mCursorIndex = index;
+        mCursorLine = getOffsetLine(index);
+        adjustCursorPosition();
+    }
+
+    public void setCursorPosition(float x, float y) {
+        int oldIndex = mCursorIndex;
+        int oldLine = mCursorLine;
+
+        float internalY = y - getPaddingTop();
+        if (internalY < 0) internalY = 0;
+
+        mCursorLine = getLogicalLineFromY(internalY);
+        int lineTop = getLineTop(mCursorLine);
+        float relativeY = internalY - lineTop;
+
+        int lineStart = getLineStart(mCursorLine);
+        String text = getLine(mCursorLine);
+
+        int left = getLeftSpace();
+        float internalX = x - getPaddingLeft();
+        float relativeX = internalX - left;
+
+        if (text.isEmpty()) {
+            mCursorIndex = lineStart;
+            mCursorPosX = left;
+            mCursorPosY = lineTop;
+        } else {
+            LineResult result = (mHighlighter != null) ? mHighlighter.getOrTokenize(mCursorLine, text) : null;
+            if (result != null && result.layout != null) {
+                // Ensure this specific line's height is accurate in the BIT
+                int measuredHeight = result.layout.getHeight();
+                if (measuredHeight != mHeightManager.getHeight(mCursorLine)) {
+                    mHeightManager.updateHeight(mCursorLine, measuredHeight);
+                    mTotalHeight = mHeightManager.getTotalHeight();
+                    // Re-calculate lineTop because updating the BIT might have shifted it
+                    lineTop = getLineTop(mCursorLine);
+                    relativeY = internalY - lineTop;
+                }
+
+                int vLine = 0;
+                if (mWordWrap) {
+                    vLine = result.layout.getLineForVertical((int) relativeY);
+                }
+                int offsetInLine = getOriginalOffset(result, vLine, relativeX);
+                int originalLen = text.length();
+
+                // Double check with measurement to find the closer character edge
+                float wLow = getLayoutHorizontal(result, offsetInLine);
+                if (offsetInLine < originalLen) {
+                    float wNext;
+                    int vLineOfNext = getLayoutLineForOffset(result, offsetInLine + 1);
+                    if (vLineOfNext != vLine) {
+                        // The next offset is on a different visual line, so its horizontal coordinate
+                        // is actually the right edge of the current character on the current visual line.
+                        // Since we are using monospace font, we can estimate it as wLow + characterWidth.
+                        // We can get the character width by measuring that specific character.
+                        char c = text.charAt(offsetInLine);
+                        float charWidth = (c == '\t') ? (spaceWidth * mTabSize) : mTextPaint.measureText(String.valueOf(c));
+                        wNext = wLow + charWidth;
+                    } else {
+                        wNext = getLayoutHorizontal(result, offsetInLine + 1);
+                    }
+                    if (Math.abs(relativeX - wNext) < Math.abs(relativeX - wLow)) {
+                        offsetInLine++;
+                        wLow = wNext;
+                    }
+                }
+
+                mCursorIndex = lineStart + offsetInLine;
+                mCursorPosX = left + (int) Math.ceil(wLow);
+                mCursorYOffsetWithinLine = result.layout.getLineTop(vLine);
+                mCursorPosY = lineTop + mCursorYOffsetWithinLine;
+            } else {
+                fallbackSearch(text, lineStart, left, relativeX);
+                mCursorYOffsetWithinLine = 0;
+                mCursorPosY = lineTop;
+            }
         }
 
-        if (mGapBuffer.isBatchEdit())
-            mGapBuffer.endBatchEdit();
+        if (mCursorIndex != oldIndex || mCursorLine != oldLine) {
+            onCursorOrSelectionChanged();
+        }
+    }
 
-        // calculate the cursor index and line
-        int length = text.length();
-        mCursorIndex += length;
+    private void fallbackSearch(String text, int lineStart, int left, float relativeX) {
+        int low = 0;
+        int high = text.length();
+        while (low < high) {
+            int mid = (low + high + 1) / 2;
+            if (measureText(text.substring(0, mid), left) <= relativeX) {
+                low = mid;
+            } else {
+                high = mid - 1;
+            }
+        }
+
+        float wLow = measureText(text.substring(0, low), left);
+        if (low < text.length()) {
+            float wNext = measureText(text.substring(0, low + 1), left);
+            if (Math.abs(relativeX - wNext) < Math.abs(relativeX - wLow)) {
+                low++;
+                wLow = wNext;
+            }
+        }
+
+        mCursorIndex = lineStart + low;
+        mCursorPosX = left + (int) wLow;
+    }
+
+    private void adjustCursorPosition() {
+        int start = getLineStart(mCursorLine);
+        int lineIndex = mCursorIndex - start;
+
+        int width;
+        int yOffset = 0;
+        if (mHighlighter != null) {
+            String lineText = getLine(mCursorLine);
+            LineResult result = mHighlighter.getOrTokenize(mCursorLine, lineText);
+            if (result != null && result.layout != null) {
+                width = (int) Math.ceil(getLayoutHorizontal(result, lineIndex));
+                if (mWordWrap) {
+                    int vLine = getLayoutLineForOffset(result, lineIndex);
+                    yOffset = result.layout.getLineTop(vLine);
+
+                    // Force JIT height measurement to ensure stability
+                    int measuredHeight = result.layout.getHeight();
+                    if (measuredHeight != mHeightManager.getHeight(mCursorLine)) {
+                        mHeightManager.updateHeight(mCursorLine, measuredHeight);
+                        mTotalHeight = mHeightManager.getTotalHeight();
+                    }
+                }
+            } else {
+                String text = mGapBuffer.substring(start, Math.min(mCursorIndex, mGapBuffer.length()));
+                width = measureText(text, getLeftSpace());
+            }
+        } else {
+            String text = mGapBuffer.substring(start, Math.min(mCursorIndex, mGapBuffer.length()));
+            width = measureText(text, getLeftSpace());
+        }
+
+        mCursorPosX = getLeftSpace() + width;
+        mCursorYOffsetWithinLine = yOffset;
+        mCursorPosY = getLineTop(mCursorLine) + yOffset;
+
+        if (mCursorPosX < getLeftSpace()) {
+            mCursorPosX = getLeftSpace();
+        }
+    }
+
+    public int getCaretPosition() {
+        return mCursorIndex;
+    }
+
+    public void setSelection(int start, int end) {
+        int len = mGapBuffer.length();
+        int s = Math.max(0, Math.min(start, len));
+        int e = Math.max(0, Math.min(end, len));
+
+        Selection.setSelection(mGapBuffer, s, e);
+
+        mCursorIndex = e;
         mCursorLine = getOffsetLine(mCursorIndex);
+
+        isSelectMode = s != e;
+        mHandleMiddleVisible = !isSelectMode;
+
+        // Cache selection range for delete operations
+        if (isSelectMode) {
+            mPendingDeleteStart = s;
+            mPendingDeleteEnd = e;
+        } else {
+            mPendingDeleteStart = -1;
+            mPendingDeleteEnd = -1;
+        }
+
         adjustCursorPosition();
+        updateSelectionHandles();
+        onCursorOrSelectionChanged();
+    }
 
-        onTextChanged();
-        scrollToVisable();
+    public int getSelectionStart() {
+        if (mGapBuffer == null) return 0;
+        int res = Selection.getSelectionStart(mGapBuffer);
+        return res < 0 ? mCursorIndex : res;
+    }
+
+    public int getSelectionEnd() {
+        if (mGapBuffer == null) return 0;
+        int res = Selection.getSelectionEnd(mGapBuffer);
+        return res < 0 ? mCursorIndex : res;
+    }
+
+    public String getSelectedText() {
+        int start = getSelectionStart();
+        int end = getSelectionEnd();
+        if (isSelectMode && start < end) {
+            return mGapBuffer.substring(start, end);
+        }
+        return "";
+    }
+
+    public int getSelectionLength() {
+        if (!isSelectMode) return 0;
+        return getSelectionEnd() - getSelectionStart();
+    }
+
+    public boolean isSelectMode() {
+        return isSelectMode;
+    }
+
+    public void selectAll() {
+        removeCallbacks(blinkAction);
+        mCursorVisible = false;
+        mHandleMiddleVisible = false;
+        isSelectMode = true;
+        mHideSelectHandles = false;
+
+        setSelection(0, mGapBuffer.length());
+
+        setCursorPosition(getSelectionEnd());
+
+        int bottom = mWordWrap ? mTotalHeight : getLineCount() * getLineHeight();
+        smoothScrollTo(0, Math.max(bottom - getHeight() + getLineHeight() * 2, 0));
+        showTextSelectionWindow();
         postInvalidate();
-        postDelayed(blinkAction, BLINK_TIMEOUT);
     }
 
-    // Insert words from typed text to word set
-    private void extractWordsFromText(String newText) {
-        if (newText == null || newText.isEmpty()) return;
-        mWordSet.add(newText); // Fast O(1) operation
+    public boolean isAllTextSelected() {
+        return getSelectionStart() == 0 &&
+                getSelectionEnd() == mGapBuffer.length() &&
+                getSelectionStart() != getSelectionEnd() &&
+                mGapBuffer.length() > 0;
     }
 
-    // Delete char before caret or currently selected range
-    public void delete() {
-        if (!isEditedMode) return; // nothing to do
-        if (mCursorIndex <= 0) return;
+    public void clearSelectionMenu() {
+        isSelectMode = false;
+        mHandleMiddleVisible = false;
+        mIsLineSelectionMode = false;
+        mPendingDeleteStart = -1;
+        mPendingDeleteEnd = -1;
+        mStartSelectionLine = -1;
+        mEndSelectionLine = -1;
+        mFirstSelectedLine = -1;
+        mSecondSelectedLine = -1;
+        mWaitingForSecondSelection = false;
+        mSelectionHandler.removeCallbacks(mClearSelectionRunnable);
+        dismissAutoComplete();
+        onCursorOrSelectionChanged();
+        postInvalidate();
+    }
+
+    private void clearSelection() {
+        clearSelectionMenu();
+        isSelectMode = false;
+        Selection.setSelection(mGapBuffer, -1);
+    }
+
+    private int[] normalizeSelection() {
+        int s = getSelectionStart();
+        int e = getSelectionEnd();
+        s = Math.max(0, Math.min(s, mGapBuffer.length()));
+        e = Math.max(0, Math.min(e, mGapBuffer.length()));
+        return new int[]{s, e};
+    }
+
+    private void updateSelectionHandles() {
+        if (!isSelectMode) return;
+
+        int selStart = getSelectionStart();
+        int selEnd = getSelectionEnd();
+
+        // Normalize offsets for handle calculations
+        int start = Math.min(selStart, selEnd);
+        int end = Math.max(selStart, selEnd);
+
+        // 1. Calculate handle positions using shared logic
+        int[] leftPos = getPositionForOffset(start, true);
+        selectHandleLeftX = leftPos[0];
+        selectHandleLeftY = leftPos[1];
+
+        int[] rightPos = getPositionForOffset(end, true);
+        selectHandleRightX = rightPos[0];
+        selectHandleRightY = rightPos[1];
+
+        // 2. Sync cursor with the 'active' end of the selection (selEnd)
+        // We use anchorBottom=false for the cursor to get the top Y position
+        int[] activePosTop = getPositionForOffset(selEnd, false);
+        mCursorPosX = (selEnd < selStart) ? selectHandleLeftX : selectHandleRightX;
+        mCursorPosY = activePosTop[1];
+
+        // Update vertical offset state for the cursor
+        int activeLine = getOffsetLine(selEnd);
+        mCursorYOffsetWithinLine = mCursorPosY - getLineTop(activeLine);
+    }
+
+    /**
+     * Helper to calculate content-relative X and Y for a given buffer offset.
+     * Centralizing this ensures consistency between handles and the cursor.
+     */
+    private int[] getPositionForOffset(int offset, boolean anchorBottom) {
+        int left = getLeftSpace();
+        int line = getOffsetLine(offset);
+        int lineStart = getLineStart(line);
+        String text = getLine(line);
+
+        if (mHighlighter != null) {
+            LineResult result = mHighlighter.getOrTokenize(line, text);
+            if (result != null && result.layout != null) {
+                int offsetInLine = offset - lineStart;
+                int x = left + (int) Math.ceil(getLayoutHorizontal(result, offsetInLine));
+
+                // JIT height update for layout stability
+                int h = result.layout.getHeight();
+                if (h != mHeightManager.getHeight(line)) {
+                    mHeightManager.updateHeight(line, h);
+                    mTotalHeight = mHeightManager.getTotalHeight();
+                }
+
+                int y;
+                if (mWordWrap) {
+                    int vLine = getLayoutLineForOffset(result, offsetInLine);
+                    y = getLineTop(line) + (anchorBottom ? result.layout.getLineBottom(vLine) : result.layout.getLineTop(vLine));
+                } else {
+                    y = anchorBottom ? getLineBottom(line) : getLineTop(line);
+                }
+                return new int[]{x, y};
+            }
+        }
+
+        // Fallback: Measure text manually if no highlighter/layout is available
+        // Optimized: Only perform substring here when actually needed
+        String prefix = text.substring(0, Math.max(0, Math.min(offset - lineStart, text.length())));
+        int x = left + measureText(prefix, left);
+        int y = anchorBottom ? getLineBottom(line) : getLineTop(line);
+        return new int[]{x, y};
+    }
+
+    private void scheduleSelectionUpdate() {
+        mSelectionHandler.removeCallbacks(mUpdateSelectionPosition);
+        mSelectionHandler.postDelayed(mUpdateSelectionPosition, 100);
+    }
+
+    private void onCursorOrSelectionChanged() {
+        isSelectMode = getSelectionStart() != getSelectionEnd();
+        scheduleSelectionUpdate();
+        if (mComposingStart == -1) {
+            mCursorWordBounds = getWordBoundsAt(mCursorIndex);
+        } else {
+            mCursorWordBounds = null;
+        }
+
+        // Update matching brace - ASYNCHRONOUSLY
+        mBraceSearchId++;
+        mMatchingBraceIndex = -1;
+        mCurrentBraceIndex = -1;
+        mMatchingBraceLine = -1;
+        mCurrentBraceLine = -1;
+        mPendingBraceCheckIdx = -1;
+        mBraceThreadHandler.removeCallbacks(mBraceSearchRunnable);
+
+        if (!isSelectMode && mGapBuffer.length() > 0) {
+            int checkIdx = -1;
+            if (mCursorIndex < mGapBuffer.length()) {
+                char c = mGapBuffer.charAt(mCursorIndex);
+                if (c == '{' || c == '}' || c == '(' || c == ')' || c == '[' || c == ']')
+                    checkIdx = mCursorIndex;
+            }
+            if (checkIdx == -1 && mCursorIndex > 0) {
+                char c = mGapBuffer.charAt(mCursorIndex - 1);
+                if (c == '{' || c == '}' || c == '(' || c == ')' || c == '[' || c == ']')
+                    checkIdx = mCursorIndex - 1;
+            }
+
+            if (checkIdx != -1) {
+                mPendingBraceCheckIdx = checkIdx;
+                // Delay slightly to wait for rapid cursor movement to stop
+                mBraceThreadHandler.postDelayed(mBraceSearchRunnable, 50);
+            }
+        }
+
+        if (mClipboardPanel != null) {
+            mSelectionHandler.removeCallbacks(mAutoHideRunnable);
+            mSelectionHandler.postDelayed(mAutoHideRunnable, 5000);
+        }
+
+        // Notify Input Method Manager about selection change
+        InputMethodManager imm = (InputMethodManager) getContext().getSystemService(Context.INPUT_METHOD_SERVICE);
+        if (imm != null) {
+            int selStart = isSelectMode ? getSelectionStart() : mCursorIndex;
+            int selEnd = isSelectMode ? getSelectionEnd() : mCursorIndex;
+
+            // If the cursor moved away from the composing region, reset it
+            if (mComposingStart != -1 && (mCursorIndex < mComposingStart || mCursorIndex > mComposingEnd)) {
+                mComposingStart = -1;
+                mComposingEnd = -1;
+            }
+
+            imm.updateSelection(this, selStart, selEnd, mComposingStart, mComposingEnd);
+        }
+
+        // Reset blinking on cursor movement/typing
+        removeCallbacks(blinkAction);
+        mCursorVisible = true;
+        postDelayed(blinkAction, BLINK_TIMEOUT * 2);
+
+        if (mSelectionListener != null) {
+            mSelectionListener.onSelectionChanged(getSelectionStart(), getSelectionEnd());
+        }
+
+        // Auto-record history if line changed
+        int line = getOffsetLine(mCursorIndex);
+        if (mLastHistoryLine != line) {
+            // Record previous line before moving if we stayed there long enough
+            if (mLastHistoryLine != -1) {
+                recordHistory();
+            }
+            mLastHistoryLine = line;
+        }
+
+        // Always refresh search highlights to update the "active match" (yellow)
+        if (mLastSearchPattern != null && !mLastSearchPattern.isEmpty()) {
+            find(mLastSearchPattern);
+        }
+
+        postInvalidate();
+    }
+
+    private boolean isInLineNumberArea(float x, float y) {
+        if (!mShowLineNumbers) return false;
+        int gutterLeftPadding = ScreenUtils.dip2px(getContext(), 12);
+        int gutterRightPadding = ScreenUtils.dip2px(getContext(), 6);
+        int totalGutterWidth = gutterLeftPadding + getLineNumberWidth() + gutterRightPadding;
+        float startX = mStickyLineNumbers ? getScrollX() : 0;
+        return x >= startX && x <= startX + totalGutterWidth;
+    }
+
+    private int getLineFromY(float y) {
+        ensureHeightsMeasuredUntil((int) y);
+        return getLogicalLineFromY(y);
+    }
+
+    private void selectLineRange(int startLine, int endLine) {
+        if (startLine < 1 || endLine < 1 || startLine > getLineCount() || endLine > getLineCount()) {
+            return;
+        }
 
         removeCallbacks(blinkAction);
-        mCursorVisiable = true;
-        mHandleMiddleVisable = false;
+        mCursorVisible = false;
+        mHandleMiddleVisible = false;
+        isSelectMode = true;
+        mIsLineSelectionMode = true;
 
-        if (isSelectMode) {
-            isSelectMode = false;
-            mGapBuffer.delete(selectionStart, selectionEnd, true);
-            mCursorIndex -= selectionEnd - selectionStart;
-        } else {
-            mGapBuffer.delete(mCursorIndex - 1, mCursorIndex, true);
-            mCursorIndex--;
-        }
+        int actualStartLine = Math.min(startLine, endLine);
+        int actualEndLine = Math.max(startLine, endLine);
 
-        // calculate cursor index and line
-        mCursorLine = getOffsetLine(mCursorIndex);
-        adjustCursorPosition();
-        onCursorOrSelectionChanged();
+        int start = getLineStart(actualStartLine);
+        int end = getLineEnd(actualEndLine) + (actualEndLine < getLineCount() ? 1 : 0);
 
-        onTextChanged();
-        scrollToVisable();
+        Selection.setSelection(mGapBuffer, start, end);
+
+        mStartSelectionLine = actualStartLine;
+        mEndSelectionLine = actualEndLine;
+
+        updateSelectionHandles();
+        showTextSelectionWindow();
         postInvalidate();
-        postDelayed(blinkAction, BLINK_TIMEOUT);
+
+        performHapticFeedback();
     }
 
-    // Handle forward delete (placeholder call used earlier)
+    private void selectSingleLine(int line) {
+        if (line < 1 || line > getLineCount()) return;
+        removeCallbacks(blinkAction);
+        mCursorVisible = false;
+        mHandleMiddleVisible = false;
+        isSelectMode = true;
+        mIsLineSelectionMode = true;
+
+        int lineStart = getLineStart(line);
+        int lineEnd = lineStart + getLine(line).length() + (line < getLineCount() ? 1 : 0);
+        setSelection(lineStart, lineEnd);
+        mStartSelectionLine = line;
+        mEndSelectionLine = line;
+
+        updateSelectionHandles();
+        showTextSelectionWindow();
+        postInvalidate();
+    }
+
+    private void clearLineSelection() {
+        mWaitingForSecondSelection = false;
+        mFirstSelectedLine = -1;
+    }
+
+    private int[] fullLineRangeForSelection(int s, int e) {
+        if (s >= e) return null;
+        int firstLine = getOffsetLine(s);
+        int lastLine = getOffsetLine(Math.max(0, e - 1));
+        int start = getLineStart(firstLine);
+        int lastLineStart = getLineStart(lastLine);
+        int end = lastLineStart + getLine(lastLine).length();
+        start = Math.max(0, Math.min(start, mGapBuffer.length()));
+        end = Math.max(0, Math.min(end, mGapBuffer.length()));
+        if (start > end) end = start;
+        return new int[]{start, end};
+    }
+
+    private int[] fullLineRangeForCursorLine(int line) {
+        int start = getLineStart(line);
+        int end = start + getLine(line).length();
+        start = Math.max(0, Math.min(start, mGapBuffer.length()));
+        end = Math.max(0, Math.min(end, mGapBuffer.length()));
+        if (start > end) end = start;
+        return new int[]{start, end};
+    }
+
+    public void selectNearestWord() {
+        String selectWord = findNearestWord();
+        if (selectWord != null) {
+            removeCallbacks(blinkAction);
+            mCursorVisible = mHandleMiddleVisible = false;
+            isSelectMode = true;
+            updateSelectionHandles();
+            setCursorPosition(getSelectionEnd());
+
+        }
+        postInvalidate();
+    }
+
+    public String findNearestWord() {
+        int length = mGapBuffer.length();
+        if (length == 0) return null;
+
+        if (mCursorIndex >= length) {
+            mCursorIndex = Math.max(0, length - 1);
+        }
+
+        int[] bounds = findSingleSpecialCharBounds();
+        if (bounds != null) {
+            setSelection(bounds[0], bounds[1]);
+            return mGapBuffer.substring(bounds[0], bounds[1]);
+        }
+
+        bounds = findWordAtCursorBounds();
+        if (bounds != null) {
+            setSelection(bounds[0], bounds[1]);
+            return mGapBuffer.substring(bounds[0], bounds[1]);
+        }
+
+        bounds = findWordInVicinityBounds();
+        if (bounds != null) {
+            setSelection(bounds[0], bounds[1]);
+            return mGapBuffer.substring(bounds[0], bounds[1]);
+        }
+
+        // If it's an empty line or just whitespace, select the line content
+        String lineText = getLine(mCursorLine);
+        if (lineText.isEmpty() || lineText.trim().isEmpty()) {
+            int start = getLineStart(mCursorLine);
+            int end = start + lineText.length();
+            // If it's not the last line, we can include the newline to select the whole empty line
+            if (end < mGapBuffer.length()) {
+                end++;
+            }
+            setSelection(start, end);
+            return mGapBuffer.substring(start, end);
+        }
+
+        bounds = findAnyNonWhitespaceBounds();
+        if (bounds != null) {
+            setSelection(bounds[0], bounds[1]);
+            return mGapBuffer.substring(bounds[0], bounds[1]);
+        }
+        return null;
+    }
+
+    private int[] findSingleSpecialCharBounds() {
+        if (mCursorIndex < mGapBuffer.length()) {
+            char currentChar = mGapBuffer.charAt(mCursorIndex);
+            if (isSpecialChar(currentChar)) {
+                return new int[]{mCursorIndex, mCursorIndex + 1};
+            }
+        }
+
+        if (mCursorIndex > 0) {
+            char prevChar = mGapBuffer.charAt(mCursorIndex - 1);
+            if (isSpecialChar(prevChar)) {
+                return new int[]{mCursorIndex - 1, mCursorIndex};
+            }
+        }
+        return null;
+    }
+
+    private int[] expandSelectionFrom(int position) {
+        int length = mGapBuffer.length();
+        if (position < 0 || position >= length) return null;
+        char startChar = mGapBuffer.charAt(position);
+
+        if (startChar == '\n' || isSpecialChar(startChar) || startChar == '\u200B') {
+            return null;
+        }
+
+        boolean isWhitespace = Character.isWhitespace(startChar);
+
+        int start = position;
+        while (start > 0) {
+            char c = mGapBuffer.charAt(start - 1);
+            if (c == '\n' || c == '\u200B' || (isWhitespace != Character.isWhitespace(c)) || (!isWhitespace && isSpecialChar(c)))
+                break;
+            start--;
+        }
+        int end = position;
+        while (end < length) {
+            char c = mGapBuffer.charAt(end);
+            if (c == '\n' || c == '\u200B' || (isWhitespace != Character.isWhitespace(c)) || (!isWhitespace && isSpecialChar(c)))
+                break;
+            end++;
+        }
+
+        if (start < end) {
+            return new int[]{start, end};
+        }
+        return null;
+    }
+
+    private int[] findWordAtCursorBounds() {
+        boolean atBoundary = false;
+        if (mCursorIndex < mGapBuffer.length()) {
+            char c = mGapBuffer.charAt(mCursorIndex);
+            if (Character.isWhitespace(c) || isSpecialChar(c) || c == '\u200B') atBoundary = true;
+        } else {
+            atBoundary = true;
+        }
+
+        if (atBoundary && mCursorIndex > 0) {
+            char prevChar = mGapBuffer.charAt(mCursorIndex - 1);
+            if (!Character.isWhitespace(prevChar) && !isSpecialChar(prevChar) && prevChar != '\u200B') {
+                return expandSelectionFrom(mCursorIndex - 1);
+            }
+        }
+
+        if (mCursorIndex < mGapBuffer.length()) {
+            char currentChar = mGapBuffer.charAt(mCursorIndex);
+            if (!Character.isWhitespace(currentChar) && !isSpecialChar(currentChar) && currentChar != '\u200B') {
+                return expandSelectionFrom(mCursorIndex);
+            }
+            if (Character.isWhitespace(currentChar) && currentChar != '\n') {
+                return expandSelectionFrom(mCursorIndex);
+            }
+        }
+
+        if (mCursorIndex > 0) {
+            char prevChar = mGapBuffer.charAt(mCursorIndex - 1);
+            if (Character.isWhitespace(prevChar) && prevChar != '\n') {
+                return expandSelectionFrom(mCursorIndex - 1);
+            }
+        }
+        return null;
+    }
+
+    private int[] findWordInVicinityBounds() {
+        int length = mGapBuffer.length();
+        if (length == 0) return null;
+
+        boolean hitLeftNL = false;
+        boolean hitRightNL = false;
+
+        for (int radius = 1; radius <= 20; radius++) {
+            int backwardPos = mCursorIndex - radius;
+            if (backwardPos >= 0 && !hitLeftNL) {
+                char c = mGapBuffer.charAt(backwardPos);
+                if (c == '\n') {
+                    hitLeftNL = true;
+                } else {
+                    if (isSpecialChar(c)) {
+                        return new int[]{backwardPos, backwardPos + 1};
+                    }
+                    if (!Character.isWhitespace(c)) {
+                        return expandSelectionFrom(backwardPos);
+                    }
+                }
+            }
+
+            int forwardPos = mCursorIndex + radius;
+            if (forwardPos < length && !hitRightNL) {
+                char c = mGapBuffer.charAt(forwardPos);
+                if (c == '\n') {
+                    hitRightNL = true;
+                } else {
+                    if (isSpecialChar(c)) {
+                        return new int[]{forwardPos, forwardPos + 1};
+                    }
+                    if (!Character.isWhitespace(c)) {
+                        return expandSelectionFrom(forwardPos);
+                    }
+                }
+            }
+            if (hitLeftNL && hitRightNL) break;
+        }
+        return null;
+    }
+
+    private int[] findAnyNonWhitespaceBounds() {
+        String currentLine = getLine(mCursorLine);
+        if (currentLine == null || currentLine.trim().isEmpty()) {
+            return null;
+        }
+        int lineStart = getLineStart(mCursorLine);
+        int lineEnd = lineStart + getLine(mCursorLine).length();
+
+        for (int i = lineStart; i < lineEnd; i++) {
+            if (i < mGapBuffer.length()) {
+                char c = mGapBuffer.charAt(i);
+                if (!Character.isWhitespace(c)) {
+                    if (isSpecialChar(c)) {
+                        return new int[]{i, i + 1};
+                    }
+                    return expandSelectionFrom(i);
+                }
+            }
+        }
+        return null;
+    }
+
+    private int[] getWordBoundsAt(int index) {
+        int len = mGapBuffer.length();
+        if (index < 0 || index > len) return null;
+
+        char atCursor = (index < len) ? mGapBuffer.charAt(index) : 0;
+        char beforeCursor = (index > 0) ? mGapBuffer.charAt(index - 1) : 0;
+
+        int scanFrom = -1;
+        if (isWordUnderlinePart(atCursor)) {
+            scanFrom = index;
+        } else if (isWordUnderlinePart(beforeCursor)) {
+            scanFrom = index - 1;
+        }
+
+        if (scanFrom < 0) return null;
+
+        int start = scanFrom;
+        while (start > 0 && isWordUnderlinePart(mGapBuffer.charAt(start - 1))) {
+            start--;
+        }
+
+        int end = scanFrom;
+        while (end < len && isWordUnderlinePart(mGapBuffer.charAt(end))) {
+            end++;
+        }
+
+        if (start >= end) return null;
+
+        // Reject pure-number tokens
+        boolean hasLetter = false;
+        for (int i = start; i < end; i++) {
+            if (Character.isLetter(mGapBuffer.charAt(i))) {
+                hasLetter = true;
+                break;
+            }
+        }
+        if (!hasLetter) return null;
+
+        // Reject if the surrounding token (including separators) contains _
+        // Walk outward to check the full identifier context
+        int ctxStart = start;
+        while (ctxStart > 0) {
+            char c = mGapBuffer.charAt(ctxStart - 1);
+            if (!isWordUnderlinePart(c) && c != '_') break;
+            ctxStart--;
+        }
+        int ctxEnd = end;
+        while (ctxEnd < len) {
+            char c = mGapBuffer.charAt(ctxEnd);
+            if (!isWordUnderlinePart(c) && c != '_') break;
+            ctxEnd++;
+        }
+        String fullToken = mGapBuffer.substring(ctxStart, ctxEnd);
+        if (fullToken.contains("_")) return null;
+
+        if (end - start < 2) return null;
+
+        return new int[]{start, end};
+    }
+
+    private boolean isSpecialChar(char c) {
+        String specialChars = ":;\"'`.,!?@#$%^&*()+=[]{}<>~|\\";
+        return specialChars.indexOf(c) >= 0;
+    }
+
+    private boolean isInstructionPart(char c) {
+        // Used ONLY for autocomplete prefix scanning
+        return Character.isLetterOrDigit(c) || c == '_';
+    }
+
+    private boolean isWordUnderlinePart(char c) {
+        // Used for cursor word underline — only letters, digits, and hyphen
+        // Excludes: / _ . : (these are separators in smali-style identifiers)
+        return Character.isLetter(c) || c == '-';
+    }
+
+    private void replaceInternal(int start, int end, String text) {
+        if (!isEditedMode) return;
+
+        // Efficiently track word changes here instead of in TextWatcher to avoid batching bugs
+        // Optimization: Skip word map updates for very large changes to avoid OOM and lag
+        int changeLen = end - start;
+        if (changeLen > 0 && changeLen < 100000 && end <= mGapBuffer.length()) {
+            removeWordsFromMap(mGapBuffer.substring(start, end));
+        }
+
+        if (text != null && !text.isEmpty()) {
+            if (text.length() < 100000) {
+                addWordsToMap(text);
+            }
+        }
+
+        mGapBuffer.markSelectionBefore(getSelectionStart(), getSelectionEnd(), isSelectMode);
+
+        mGapBuffer.beginBatchEdit();
+        try {
+            mGapBuffer.replace(start, end, text, true);
+            onTextChanged(getOffsetLine(start));
+
+            int afterLength = (text != null ? text.length() : 0);
+            int newCursor = start + afterLength;
+
+            Selection.setSelection(mGapBuffer, newCursor);
+
+            mCursorIndex = newCursor;
+            mCursorLine = getOffsetLine(mCursorIndex);
+            adjustCursorPosition();
+            onCursorOrSelectionChanged();
+
+            mGapBuffer.markSelectionAfter(mCursorIndex, mCursorIndex, false);
+        } finally {
+            mGapBuffer.endBatchEdit();
+        }
+
+        scrollToVisible();
+    }
+
+    private void insert(String textToInsert) {
+        if (!isEditedMode) return;
+
+        int start = getSelectionStart();
+        int end = getSelectionEnd();
+
+        // Composing range replacement
+        if (!isSelectMode && mComposingStart != -1 && mComposingEnd != -1) {
+            start = Math.min(mComposingStart, mComposingEnd);
+            end = Math.max(mComposingStart, mComposingEnd);
+            mComposingStart = mComposingEnd = -1;
+        }
+
+        String actualText = textToInsert;
+        if (actualText.equals("\n") && mAutoIndentEnabled) {
+            String indent = getAutoIndent(start);
+            actualText = "\n" + indent;
+        }
+
+        removeCallbacks(blinkAction);
+        mCursorVisible = true;
+        mHandleMiddleVisible = false;
+
+        replaceInternal(start, end, actualText);
+
+        isSelectMode = false;
+        postDelayed(blinkAction, BLINK_TIMEOUT * 2);
+    }
+
+    public void insertText(String text) {
+        if (text == null || text.isEmpty()) return;
+        replaceInternal(getSelectionStart(), getSelectionEnd(), text);
+    }
+
+    public void delete() {
+        if (!isEditedMode) return;
+
+        int start, end;
+
+        if (mPendingDeleteStart != -1 && mPendingDeleteEnd != -1
+                && mPendingDeleteStart != mPendingDeleteEnd) {
+            // Use cached selection — immune to span/isSelectMode corruption by IME
+            start = mPendingDeleteStart;
+            end = mPendingDeleteEnd;
+            mPendingDeleteStart = -1;
+            mPendingDeleteEnd = -1;
+        } else {
+            if (mCursorIndex <= 0) return;
+            start = mCursorIndex - 1;
+            end = mCursorIndex;
+        }
+
+        int len = mGapBuffer.length();
+        start = Math.max(0, Math.min(start, len));
+        end = Math.max(0, Math.min(end, len));
+        if (start >= end) {
+            if (mCursorIndex <= 0) return;
+            start = mCursorIndex - 1;
+            end = mCursorIndex;
+        }
+
+        removeCallbacks(blinkAction);
+        mCursorVisible = true;
+        mHandleMiddleVisible = false;
+        isSelectMode = false;
+
+        replaceInternal(start, end, "");
+
+        postDelayed(blinkAction, BLINK_TIMEOUT * 2);
+    }
+
     private void handleForwardDelete() {
         if (!isEditedMode) return;
-        if (mCursorIndex >= mGapBuffer.length()) return;
+
+        int start = getSelectionStart();
+        int end = getSelectionEnd();
+
+        if (!isSelectMode) {
+            if (mCursorIndex >= mGapBuffer.length()) return;
+            start = mCursorIndex;
+            end = mCursorIndex + 1;
+        }
 
         removeCallbacks(blinkAction);
-        mCursorVisiable = true;
-        mHandleMiddleVisable = false;
+        mCursorVisible = true;
+        mHandleMiddleVisible = false;
 
-        if (isSelectMode) {
-            isSelectMode = false;
-            mGapBuffer.delete(selectionStart, selectionEnd, true);
-            mCursorIndex = selectionStart;
-        } else {
-            mGapBuffer.delete(mCursorIndex, mCursorIndex + 1, true);
-            // Cursor index stays the same when forward deleting
-        }
+        replaceInternal(start, end, "");
 
-        mCursorLine = getOffsetLine(mCursorIndex);
-        adjustCursorPosition();
-
-        onCursorOrSelectionChanged();
-
-        clearSyntaxCache();
-        onTextChanged();
-        scrollToVisable();
-
-        mCurrentPrefix = getCurrentPrefix();
-        if (mCurrentPrefix.isEmpty()) {
-            dismissAutoComplete();
-        } else {
-            filterAndShowSuggestions(mCurrentPrefix);
-        }
-
-        postInvalidate();
-        postDelayed(blinkAction, BLINK_TIMEOUT);
+        isSelectMode = false;
+        postDelayed(blinkAction, BLINK_TIMEOUT * 2);
     }
 
-    // ---------- Clipboard (copy/cut/paste/share) ----------
-    // Copy selected text to clipboard
+    public boolean canUndo() {
+        return mGapBuffer.canUndo();
+    }
+
+    public boolean canRedo() {
+        return mGapBuffer.canRedo();
+    }
+
+    public void undo() {
+        removeCallbacks(blinkAction);
+        int index = mGapBuffer.undo();
+        if (index >= 0) {
+            // Selection spans are automatically restored in GapBuffer.undo() via setSelection
+            // We just need to sync our UI fields
+            mCursorIndex = getSelectionEnd();
+            isSelectMode = getSelectionStart() != getSelectionEnd();
+            mCursorLine = getOffsetLine(mCursorIndex);
+            adjustCursorPosition();
+            onCursorOrSelectionChanged();
+            scrollToVisible();
+
+            if (isSelectMode) {
+                mCursorVisible = false;
+                mHandleMiddleVisible = false;
+                mHideSelectHandles = false;
+                showTextSelectionWindow();
+            } else {
+                mCursorVisible = true;
+                mHandleMiddleVisible = true;
+                mHideSelectHandles = false;
+                hideTextSelectionWindow();
+                postDelayed(blinkAction, BLINK_TIMEOUT);
+            }
+        }
+    }
+
+    public void redo() {
+        removeCallbacks(blinkAction);
+        int index = mGapBuffer.redo();
+        if (index >= 0) {
+            mCursorIndex = getSelectionEnd();
+            isSelectMode = getSelectionStart() != getSelectionEnd();
+            mCursorLine = getOffsetLine(mCursorIndex);
+            adjustCursorPosition();
+            onCursorOrSelectionChanged();
+            scrollToVisible();
+
+            if (isSelectMode) {
+                mCursorVisible = false;
+                mHandleMiddleVisible = false;
+                mHideSelectHandles = false;
+                showTextSelectionWindow();
+            } else {
+                mCursorVisible = true;
+                mHandleMiddleVisible = true;
+                mHideSelectHandles = false;
+                hideTextSelectionWindow();
+                postDelayed(blinkAction, BLINK_TIMEOUT);
+            }
+        }
+    }
+
     public void copy() {
         String text = getSelectedText();
-        if (text != null && !text.equals("")) {
+        if (text != null && !text.isEmpty()) {
             ClipData data = ClipData.newPlainText("content", text);
             mClipboard.setPrimaryClip(data);
         }
     }
 
-    // Cut selected text to clipboard (copy then delete)
     public void cut() {
         copy();
         delete();
         isSelectMode = false;
     }
 
-    // Paste from clipboard at caret
     public void paste() {
         if (mClipboard.hasPrimaryClip()) {
             ClipDescription description = mClipboard.getPrimaryClipDescription();
-            if (description.hasMimeType(ClipDescription.MIMETYPE_TEXT_PLAIN)) {
+            if (description != null && description.hasMimeType(ClipDescription.MIMETYPE_TEXT_PLAIN)) {
                 ClipData data = mClipboard.getPrimaryClip();
-                ClipData.Item item = data.getItemAt(0);
-                String text = item.getText().toString();
+                ClipData.Item item = null;
+                if (data != null) {
+                    item = data.getItemAt(0);
+                }
+                String text = null;
+                if (item != null) {
+                    text = item.getText().toString();
+                }
                 insert(text);
             }
         }
     }
 
-    // Share currently selected text via ACTION_SEND
-    public void shareText() {
-        if (isSelectMode) {
-            String selectedText = getSelectedText();
-            Intent shareIntent = new Intent(Intent.ACTION_SEND);
-            shareIntent.setType("text/plain");
-            shareIntent.putExtra(Intent.EXTRA_TEXT, selectedText);
-            getContext().startActivity(Intent.createChooser(shareIntent, "Share text"));
+    private void copyRangeToClipboard(int start, int end, String label) {
+        int s = Math.max(0, Math.min(start, mGapBuffer.length()));
+        int e = Math.max(0, Math.min(end, mGapBuffer.length()));
+        if (s > e) e = s;
+        String text = mGapBuffer.substring(s, e);
+        if (text != null && !text.isEmpty()) {
+            ClipData data = ClipData.newPlainText(label, text);
+            mClipboard.setPrimaryClip(data);
         }
     }
 
-    // ---------- Search / Replace operations ----------
-    // Scroll to the found match position
-    private void scrollToFindPosition(int curr) {
-        int first = mReplaceList.get(curr).first;
-        int second = mReplaceList.get(curr).second;
+    private String getAutoIndent(int offset) {
+        if (!mAutoIndentEnabled || offset < 0) return "";
 
-        setCursorPosition(second);
-        adjustSelectRange(first, second);
+        try {
+            int line = getOffsetLine(offset);
+            int lineStart = getLineStart(line);
+            if (lineStart < 0 || lineStart > mGapBuffer.length()) return "";
 
-        smoothScrollTo(Math.max(0, selectHandleLeftX - getWidth() / 2),
-        Math.max(0, selectHandleLeftY - getHeight() / 2));
+            String currentLinePrefix = mGapBuffer.substring(lineStart, Math.min(offset, mGapBuffer.length()));
+
+            StringBuilder indent = new StringBuilder();
+            for (int i = 0; i < currentLinePrefix.length(); i++) {
+                char c = currentLinePrefix.charAt(i);
+                if (c == ' ' || c == '\t') {
+                    indent.append(c);
+                } else {
+                    break;
+                }
+            }
+
+            String indentStr = indent.toString();
+            String trimmed = currentLinePrefix.trim();
+
+            // Smart Indent: Increase indentation after certain characters/directives
+            if (trimmed.endsWith("{") || trimmed.endsWith("(") || trimmed.endsWith("[") ||
+                    trimmed.startsWith(".method") || trimmed.startsWith(".annotation") ||
+                    trimmed.startsWith(".subannotation")) {
+                // Add tab size in spaces
+                for (int i = 0; i < mTabSize; i++) {
+                    indent.append(" ");
+                }
+                indentStr = indent.toString();
+            }
+
+            return indentStr;
+        } catch (Exception e) {
+            Log.e(TAG, "Error in getAutoIndent: " + e.getMessage());
+            return "";
+        }
+    }
+
+    public void onTextChanged() {
+        if (mHighlighter != null) {
+            mHighlighter.clearCache();
+        }
+        updateLineWidth();
+        if (mWordWrap) {
+            computeLineTops();
+        }
+        if (mTextListener != null) mTextListener.onTextChanged();
+    }
+
+    public void onTextChanged(int fromLine) {
+        if (mHighlighter != null) {
+            mHighlighter.invalidateSubsequentStates(fromLine);
+            mHighlighter.invalidateSubsequentLines(fromLine);
+        }
+        // Sync cursor line before updateLineWidth touches it
+        int lineCount = getLineCount();
+        if (mCursorLine < 1 || mCursorLine > lineCount) {
+            mCursorLine = Math.max(1, Math.min(mCursorLine, lineCount));
+            mCursorIndex = Math.max(0, Math.min(mCursorIndex, mGapBuffer.length()));
+        }
+        updateLineWidth();
+        if (mWordWrap) {
+            int oldCount = mHeightManager.count;
+            int newCount = getLineCount();
+            mHeightManager.adjustLineCount(fromLine, oldCount, newCount, getLineHeight());
+            mTotalHeight = mHeightManager.getTotalHeight();
+        }
+        if (mTextListener != null) mTextListener.onTextChanged();
+
+        removeCallbacks(mAutoCompleteRunnable);
+        postDelayed(mAutoCompleteRunnable, AUTO_COMPLETE_DELAY);
+
+        // Schedule re-search if pattern exists
+        if (!mLastSearchPattern.isEmpty()) {
+            mSearchHandler.removeCallbacks(mSearchRunnable);
+            mSearchHandler.postDelayed(mSearchRunnable, 500);
+        }
+    }
+
+    public void copyLine() {
+        if (isSelectMode) {
+            int[] sel = normalizeSelection();
+            int s = sel[0], e = sel[1];
+            int[] range = fullLineRangeForSelection(s, e);
+            if (range != null) {
+                copyRangeToClipboard(range[0], range[1], "lines");
+                return;
+            }
+
+        }
+
+        int[] range = fullLineRangeForCursorLine(mCursorLine);
+        copyRangeToClipboard(range[0], range[1], "line");
+        setSelection(range[0], range[1]);
+    }
+
+    public void cutLine() {
+        if (isSelectMode) {
+            int[] sel = normalizeSelection();
+            int s = sel[0], e = sel[1];
+            int[] range = fullLineRangeForSelection(s, e);
+            if (range != null) {
+                copyRangeToClipboard(range[0], range[1], "lines");
+                batchDeleteWithSelectionSnapshot(range[0], range[1],
+                        true, getSelectionStart(), getSelectionEnd(),
+                        false, -1, -1);
+                clearSelection();
+                mCursorIndex = range[0];
+                mCursorLine = getOffsetLine(mCursorIndex);
+                adjustCursorPosition();
+                postInvalidate();
+                return;
+            }
+
+        }
+
+        int[] range = fullLineRangeForCursorLine(mCursorLine);
+        copyRangeToClipboard(range[0], range[1], "line");
+        batchDeleteWithSelectionSnapshot(range[0], range[1],
+                false, getSelectionStart(), getSelectionEnd(),
+                false, -1, -1);
+        mCursorIndex = range[0];
+        mCursorLine = getOffsetLine(mCursorIndex);
+        adjustCursorPosition();
+        clearSelectionMenu();
         postInvalidate();
     }
 
-    // Find current replace list index for selectionStart/End via binary search
-    private int current() {
-        // Comparator implementation
-        Comparator<Pair<Integer, Integer>> comparator = new Comparator<Pair<Integer, Integer>>() {
-            @Override
-            public int compare(Pair<Integer, Integer> a, Pair<Integer, Integer> b) {
-                int result = a.first - b.first;
-                return result == 0 ? a.second - b.second : result;
+    public void replaceLine() {
+        if (!mClipboard.hasPrimaryClip()) return;
+        ClipData data = mClipboard.getPrimaryClip();
+        if (data == null || data.getItemCount() == 0) return;
+        ClipData.Item item = data.getItemAt(0);
+        CharSequence raw = item.getText();
+        if (raw == null) return;
+        String clipboardText = raw.toString();
+        if (isSelectMode) {
+            int[] sel = normalizeSelection();
+            int s = sel[0], e = sel[1];
+            int startLine = getOffsetLine(s);
+            int[] range = fullLineRangeForSelection(s, e);
+            if (range != null) {
+                int replaceStart = range[0];
+                int replaceEnd = range[1];
+                int newSelEnd = replaceStart + clipboardText.length();
+                batchReplaceWithSelectionSnapshot(replaceStart, replaceEnd, clipboardText,
+                        true, s, e,
+                        true, replaceStart, newSelEnd);
+
+
+                clearSelectionMenu();
+                mCursorIndex = getSelectionEnd();
+                mCursorLine = getOffsetLine(mCursorIndex);
+                adjustCursorPosition();
+                onTextChanged(startLine);
+                postInvalidate();
+                return;
             }
-        };
-
-        // binarySearch using the comparator
-        return Collections.binarySearch(mReplaceList,
-                new Pair<Integer, Integer>(selectionStart, selectionEnd),
-                comparator);
-    }
-
-    // Move to previous match
-    public void previous() {
-        int currIndex = current();
-        int prev = --currIndex;
-        if (prev < 0) {
-            prev = mReplaceList.size() - 1;
         }
-        scrollToFindPosition(prev);
+
+        int[] range = fullLineRangeForCursorLine(mCursorLine);
+        int lineStart = range[0];
+        int lineEnd = range[1];
+        batchReplaceWithSelectionSnapshot(lineStart, lineEnd, clipboardText,
+                false, getSelectionStart(), getSelectionEnd(),
+                false, -1, -1);
+        clearSelection();
+        mCursorIndex = lineStart + clipboardText.length();
+        mCursorLine = getOffsetLine(mCursorIndex);
+        adjustCursorPosition();
+        postInvalidate();
     }
 
-    // Move to next match
-    public void next() {
-        int currIndex = current();
-        int next = ++currIndex;
-        if (next >= mReplaceList.size()) {
-            next = 0;
+    public void deleteLine() {
+        if (isSelectMode) {
+            int[] sel = normalizeSelection();
+            int s = sel[0], e = sel[1];
+            int[] range = fullLineRangeForSelection(s, e);
+            if (range != null) {
+                batchDeleteWithSelectionSnapshot(range[0], range[1],
+                        true, getSelectionStart(), getSelectionEnd(),
+                        false, -1, -1);
+                clearSelection();
+                mCursorIndex = Math.min(range[0], mGapBuffer.length());
+                mCursorLine = getOffsetLine(mCursorIndex);
+                adjustCursorPosition();
+                postInvalidate();
+                return;
+            }
         }
-        scrollToFindPosition(next);
+
+        int[] range = fullLineRangeForCursorLine(mCursorLine);
+        batchDeleteWithSelectionSnapshot(range[0], range[1],
+                false, getSelectionStart(), getSelectionEnd(),
+                false, -1, -1);
+        mCursorIndex = Math.min(range[0], mGapBuffer.length());
+        mCursorLine = getOffsetLine(mCursorIndex);
+        adjustCursorPosition();
+        clearSelectionMenu();
+        postInvalidate();
     }
 
-    // Find all matches for regex in buffer
+    public void emptyLine() {
+        if (isSelectMode) {
+            int[] sel = normalizeSelection();
+            int s = sel[0], e = sel[1];
+            int[] range = fullLineRangeForSelection(s, e);
+            if (range != null) {
+                mGapBuffer.markSelectionBefore(getSelectionStart(), getSelectionEnd(), true);
+                mGapBuffer.beginBatchEdit();
+                try {
+                    int firstLine = getOffsetLine(s);
+                    int lastLine = getOffsetLine(Math.max(0, e - 1));
+                    for (int line = firstLine; line <= lastLine; line++) {
+                        int start = getLineStart(line);
+                        int end = start + getLine(line).length();
+                        if (end > start) {
+                            mGapBuffer.delete(start, end, true);
+                        }
+                    }
+                    mGapBuffer.markSelectionAfter(-1, -1, false);
+                } finally {
+                    mGapBuffer.endBatchEdit();
+                }
+
+                clearSelection();
+                mCursorLine = getOffsetLine(range[0]);
+                mCursorIndex = getLineStart(mCursorLine);
+                adjustCursorPosition();
+                postInvalidate();
+                return;
+            }
+
+        }
+
+        int[] range = fullLineRangeForCursorLine(mCursorLine);
+        int lineStart = range[0];
+        int lineEnd = range[1];
+        if (lineEnd > lineStart) {
+            mGapBuffer.beginBatchEdit();
+            try {
+                mGapBuffer.delete(lineStart, lineEnd, true);
+            } finally {
+                mGapBuffer.endBatchEdit();
+            }
+        }
+        mCursorIndex = lineStart;
+        adjustCursorPosition();
+        clearSelectionMenu();
+        postInvalidate();
+    }
+
+    public void duplicateLine() {
+        mGapBuffer.beginBatchEdit();
+        try {
+            if (isSelectMode) {
+                int start = getSelectionStart();
+                int end = getSelectionEnd();
+
+                int startLine = getOffsetLine(start);
+                int endLine = getOffsetLine(end);
+
+                int lineStart = getLineStart(startLine);
+                int lineEnd = getLineEnd(endLine);
+
+                String block = mGapBuffer.substring(lineStart, lineEnd);
+
+                mGapBuffer.insert(lineEnd, "\n" + block, true);
+                onTextChanged(startLine);
+
+                int dupStart = lineEnd + 1;
+                int dupEnd = dupStart + block.length();
+
+                setSelection(dupStart, dupEnd);
+
+                updateSelectionHandles();
+                scrollToVisible();
+                postInvalidate();
+                return;
+            }
+
+            int currentLine = mCursorLine;
+            int lineStart = getLineStart(currentLine);
+            int lineEnd = getLineEnd(currentLine);
+            String lineText = mGapBuffer.substring(lineStart, lineEnd);
+
+            mGapBuffer.insert(lineEnd, "\n" + lineText, true);
+            onTextChanged(currentLine);
+
+            int col = getColumn();
+            int newLine = currentLine + 1;
+            int newLineStart = getLineStart(newLine);
+            int target = newLineStart + col;
+
+            int newLineEnd = getLineEnd(newLine);
+            if (target > newLineEnd) {
+                target = newLineEnd;
+            }
+
+            setCursorPosition(target);
+
+            isSelectMode = false;
+            clearLineSelection();
+            scrollToVisible();
+            postInvalidate();
+            postInvalidate();
+        } finally {
+            mGapBuffer.endBatchEdit();
+        }
+    }
+
+    public void convertSelectionToLowerCase() {
+        if (isSelectMode) {
+            int s = getSelectionStart();
+            int e = getSelectionEnd();
+            if (s == e) return;
+
+            String selectedText = mGapBuffer.substring(s, e);
+            if (selectedText != null && !selectedText.isEmpty()) {
+                String lowerCaseText = selectedText.toLowerCase();
+
+                mGapBuffer.beginBatchEdit();
+                try {
+                    mGapBuffer.replace(s, e, lowerCaseText, true);
+                    setSelection(s, s + lowerCaseText.length());
+                } finally {
+                    mGapBuffer.endBatchEdit();
+                }
+                updateSelectionHandles();
+            }
+        } else {
+            int lineStart = getLineStart(mCursorLine);
+            String currentLine = getLine(mCursorLine);
+            if (currentLine != null && !currentLine.isEmpty()) {
+                String lowerCaseText = currentLine.toLowerCase();
+
+                mGapBuffer.beginBatchEdit();
+                mGapBuffer.replace(lineStart, lineStart + currentLine.length(), lowerCaseText, true);
+                mGapBuffer.endBatchEdit();
+                clearSelectionMenu();
+
+                mCursorIndex = lineStart + lowerCaseText.length();
+                mCursorLine = getOffsetLine(mCursorIndex);
+                adjustCursorPosition();
+            }
+        }
+        onTextChanged();
+        postInvalidate();
+    }
+
+    public void convertSelectionToUpperCase() {
+        if (isSelectMode) {
+            int s = getSelectionStart();
+            int e = getSelectionEnd();
+            if (s == e) return;
+
+            String selectedText = mGapBuffer.substring(s, e);
+            if (selectedText != null && !selectedText.isEmpty()) {
+                String upperCaseText = selectedText.toUpperCase();
+
+                mGapBuffer.beginBatchEdit();
+                try {
+                    mGapBuffer.replace(s, e, upperCaseText, true);
+                    setSelection(s, s + upperCaseText.length());
+                } finally {
+                    mGapBuffer.endBatchEdit();
+                }
+                updateSelectionHandles();
+            }
+        } else {
+
+            int lineStart = getLineStart(mCursorLine);
+            String currentLine = getLine(mCursorLine);
+            if (currentLine != null && !currentLine.isEmpty()) {
+                String upperCaseText = currentLine.toUpperCase();
+                mGapBuffer.beginBatchEdit();
+                mGapBuffer.replace(lineStart, lineStart + currentLine.length(), upperCaseText, true);
+                mGapBuffer.endBatchEdit();
+                clearSelectionMenu();
+
+                mCursorIndex = lineStart + upperCaseText.length();
+                mCursorLine = getOffsetLine(mCursorIndex);
+                adjustCursorPosition();
+            }
+        }
+        onTextChanged();
+        postInvalidate();
+    }
+
+    public void increaseIndent() {
+        int s = getSelectionStart();
+        int e = getSelectionEnd();
+        int start = Math.min(s, e);
+        int end = Math.max(s, e);
+
+        mGapBuffer.beginBatchEdit();
+        try {
+            if (isSelectMode) {
+                int startLine = getOffsetLine(start);
+                int endLine = getOffsetLine(end == 0 ? 0 : end - 1);
+
+                int blockStart = getLineStart(startLine);
+                int lastLineEnd = getLineEnd(endLine);
+                String block = mGapBuffer.substring(blockStart, lastLineEnd);
+
+                String[] lines = block.split("\n", -1);
+                StringBuilder sb = new StringBuilder();
+                int addedTotal = 0;
+                for (int i = 0; i < lines.length; i++) {
+                    sb.append("    ").append(lines[i]);
+                    if (i < lines.length - 1) sb.append("\n");
+                    addedTotal += 4;
+                }
+
+                mGapBuffer.replace(blockStart, lastLineEnd, sb.toString(), true);
+                onTextChanged(startLine);
+
+                // Adjust selection to cover the newly indented lines
+                setSelection(start + 4, end + addedTotal);
+                updateSelectionHandles();
+            } else {
+                int lineStart = getLineStart(mCursorLine);
+                mGapBuffer.insert(lineStart, "    ", true);
+                onTextChanged(mCursorLine);
+
+                mCursorIndex += 4;
+                adjustCursorPosition();
+                clearSelectionMenu();
+            }
+        } finally {
+            mGapBuffer.endBatchEdit();
+        }
+        postInvalidate();
+    }
+
+    public void decreaseIndent() {
+        int s = getSelectionStart();
+        int e = getSelectionEnd();
+        int start = Math.min(s, e);
+        int end = Math.max(s, e);
+
+        mGapBuffer.beginBatchEdit();
+        try {
+            if (!isSelectMode) {
+                int lineStart = getLineStart(mCursorLine);
+                String line = getLine(mCursorLine);
+
+                int spacesToRemove = 0;
+                if (line.startsWith("    ")) spacesToRemove = 4;
+                else if (line.startsWith("  ")) spacesToRemove = 2;
+                else if (line.startsWith("\t")) spacesToRemove = 1;
+                else if (line.startsWith(" ")) spacesToRemove = 1;
+
+                if (spacesToRemove > 0) {
+                    mGapBuffer.delete(lineStart, lineStart + spacesToRemove, true);
+                    onTextChanged(mCursorLine);
+                    mCursorIndex = Math.max(0, mCursorIndex - spacesToRemove);
+                    adjustCursorPosition();
+                }
+            } else {
+                int startLine = getOffsetLine(start);
+                int endLine = getOffsetLine(end == 0 ? 0 : end - 1);
+
+                int blockStart = getLineStart(startLine);
+                int lastLineEnd = getLineEnd(endLine);
+                String block = mGapBuffer.substring(blockStart, lastLineEnd);
+
+                String[] lines = block.split("\n", -1);
+                StringBuilder sb = new StringBuilder();
+                int removedTotal = 0;
+                int firstLineRemoved = 0;
+
+                for (int i = 0; i < lines.length; i++) {
+                    String line = lines[i];
+                    int spacesToRemove = 0;
+                    if (line.startsWith("    ")) spacesToRemove = 4;
+                    else if (line.startsWith("  ")) spacesToRemove = 2;
+                    else if (line.startsWith("\t")) spacesToRemove = 1;
+                    else if (line.startsWith(" ")) spacesToRemove = 1;
+
+                    if (spacesToRemove > 0) {
+                        sb.append(line.substring(spacesToRemove));
+                        removedTotal += spacesToRemove;
+                        if (i == 0) firstLineRemoved = spacesToRemove;
+                    } else {
+                        sb.append(line);
+                    }
+                    if (i < lines.length - 1) sb.append("\n");
+                }
+
+                mGapBuffer.replace(blockStart, lastLineEnd, sb.toString(), true);
+                onTextChanged(startLine);
+
+                setSelection(Math.max(blockStart, start - firstLineRemoved), Math.max(blockStart, end - removedTotal));
+                updateSelectionHandles();
+            }
+        } finally {
+            mGapBuffer.endBatchEdit();
+        }
+        postInvalidate();
+    }
+
+    public void toggleComment() {
+        int startLine, endLine;
+        int s = getSelectionStart();
+        int e = getSelectionEnd();
+        if (isSelectMode) {
+            startLine = getOffsetLine(s);
+            endLine = getOffsetLine(e == 0 ? 0 : Math.max(0, e - 1));
+        } else {
+            startLine = endLine = mCursorLine;
+        }
+
+        String commentStart = getCommentBlock();
+        String commentEnd = null;
+
+        if (commentStart == null || commentStart.isEmpty()) {
+            if (mHighlighter != null) {
+                List<modder.hub.editor.highlight.CommentDef> defs = mHighlighter.getCommentDefs();
+                if (!defs.isEmpty()) {
+                    commentStart = defs.get(0).startsWith;
+                    commentEnd = defs.get(0).endsWith;
+                }
+            }
+        }
+
+        if (commentStart == null || commentStart.isEmpty()) return;
+
+        final String cStart = commentStart;
+        final String cEnd = commentEnd;
+        final boolean isDoubleMarker = cEnd != null && !cEnd.isEmpty();
+
+        mGapBuffer.beginBatchEdit();
+        try {
+            boolean allCommented = true;
+            for (int i = startLine; i <= endLine; i++) {
+                String line = getLine(i);
+                if (line.trim().isEmpty()) continue;
+                if (!isLineCommented(line, cStart, cEnd)) {
+                    allCommented = false;
+                    break;
+                }
+            }
+
+            int blockStart = getLineStart(startLine);
+            int blockEnd = getLineEnd(endLine);
+            String block = mGapBuffer.substring(blockStart, blockEnd);
+            String[] lines = block.split("\n", -1);
+            StringBuilder sb = new StringBuilder();
+
+            int newSelStart = s;
+            int newSelEnd = e;
+            int currentOffsetInBuf = blockStart;
+
+            for (int i = 0; i < lines.length; i++) {
+                String line = lines[i];
+                int lineLen = line.length();
+                String newLine = line;
+                int lineStartInBuf = currentOffsetInBuf;
+
+                if (!line.trim().isEmpty()) {
+                    if (allCommented) {
+                        // Uncomment
+                        if (isLineCommented(line, cStart, cEnd)) {
+                            int contentStart = 0;
+                            while (contentStart < line.length() && Character.isWhitespace(line.charAt(contentStart))) {
+                                contentStart++;
+                            }
+
+                            int contentEnd = line.length();
+                            while (contentEnd > contentStart && Character.isWhitespace(line.charAt(contentEnd - 1))) {
+                                contentEnd--;
+                            }
+
+                            // Remove start marker
+                            int removeStartLen = cStart.length();
+                            if (contentStart + removeStartLen < line.length() && line.charAt(contentStart + removeStartLen) == ' ') {
+                                removeStartLen++;
+                            }
+
+                            // Remove end marker if exists
+                            int removeEndLen = 0;
+                            if (isDoubleMarker) {
+                                removeEndLen = cEnd.length();
+                                if (contentEnd - removeStartLen - removeEndLen >= contentStart && line.charAt(contentEnd - removeEndLen - 1) == ' ') {
+                                    removeEndLen++;
+                                }
+                            }
+
+                            newLine = line.substring(0, contentStart) +
+                                    line.substring(contentStart + removeStartLen, contentEnd - removeEndLen) +
+                                    line.substring(contentEnd);
+
+                            // Re-calculate more precisely for selection shift
+                            // Start Shift
+                            int shiftStart = -removeStartLen;
+                            int removeStartPos = lineStartInBuf + contentStart;
+                            if (newSelStart > removeStartPos) {
+                                if (newSelStart < removeStartPos - shiftStart)
+                                    newSelStart = removeStartPos;
+                                else newSelStart += shiftStart;
+                            }
+                            if (newSelEnd > removeStartPos) {
+                                if (newSelEnd < removeStartPos - shiftStart)
+                                    newSelEnd = removeStartPos;
+                                else newSelEnd += shiftStart;
+                            }
+
+                            // End Shift
+                            if (isDoubleMarker) {
+                                int shiftEnd = -removeEndLen;
+                                int removeEndPos = lineStartInBuf + contentEnd - removeEndLen;
+                                if (newSelStart > removeEndPos) {
+                                    if (newSelStart < removeEndPos - shiftEnd)
+                                        newSelStart = removeEndPos;
+                                    else newSelStart += shiftEnd;
+                                }
+                                if (newSelEnd > removeEndPos) {
+                                    if (newSelEnd < removeEndPos - shiftEnd)
+                                        newSelEnd = removeEndPos;
+                                    else newSelEnd += shiftEnd;
+                                }
+                            }
+                        }
+                    } else {
+                        // Comment
+                        if (!isLineCommented(line, cStart, cEnd)) {
+                            int contentStart = 0;
+                            while (contentStart < line.length() && Character.isWhitespace(line.charAt(contentStart))) {
+                                contentStart++;
+                            }
+
+                            int contentEnd = line.length();
+                            while (contentEnd > contentStart && Character.isWhitespace(line.charAt(contentEnd - 1))) {
+                                contentEnd--;
+                            }
+
+                            String startAdd = cStart + " ";
+                            String endAdd = isDoubleMarker ? (" " + cEnd) : "";
+
+                            newLine = line.substring(0, contentStart) + startAdd +
+                                    line.substring(contentStart, contentEnd) +
+                                    endAdd + line.substring(contentEnd);
+
+                            // Selection shifts
+                            int insertStartAt = lineStartInBuf + contentStart;
+                            if (newSelStart >= insertStartAt) newSelStart += startAdd.length();
+                            if (newSelEnd >= insertStartAt) newSelEnd += startAdd.length();
+
+                            if (isDoubleMarker) {
+                                int insertEndAt = lineStartInBuf + contentEnd + startAdd.length();
+                                if (newSelStart >= insertEndAt) newSelStart += endAdd.length();
+                                if (newSelEnd >= insertEndAt) newSelEnd += endAdd.length();
+                            }
+                        }
+                    }
+                }
+
+                sb.append(newLine);
+                if (i < lines.length - 1) sb.append("\n");
+                currentOffsetInBuf += lineLen + 1;
+            }
+
+            mGapBuffer.replace(blockStart, blockEnd, sb.toString(), true);
+            onTextChanged(startLine);
+
+            if (isSelectMode) {
+                setSelection(newSelStart, newSelEnd);
+                updateSelectionHandles();
+            } else {
+                mCursorIndex = newSelStart;
+                mCursorLine = getOffsetLine(mCursorIndex);
+                adjustCursorPosition();
+                clearSelectionMenu();
+            }
+        } finally {
+            mGapBuffer.endBatchEdit();
+        }
+        postInvalidate();
+    }
+
+    private boolean isLineCommented(String line, String cStart, String cEnd) {
+        if (line == null || line.trim().isEmpty()) return false;
+        int contentStart = 0;
+        while (contentStart < line.length() && Character.isWhitespace(line.charAt(contentStart))) {
+            contentStart++;
+        }
+        if (!line.startsWith(cStart, contentStart)) return false;
+
+        if (cEnd != null && !cEnd.isEmpty()) {
+            int contentEnd = line.length();
+            while (contentEnd > contentStart && Character.isWhitespace(line.charAt(contentEnd - 1))) {
+                contentEnd--;
+            }
+            return line.substring(contentStart, contentEnd).endsWith(cEnd);
+        }
+        return true;
+    }
+
     public void find(String regex) {
-        if (!mReplaceList.isEmpty())
-            mReplaceList.clear();
+        mLastSearchPattern = regex != null ? regex : "";
+        if (mReplaceList == null) mReplaceList = new ArrayList<>();
+        mReplaceList.clear();
 
-        Matcher matcher = Pattern.compile(regex).matcher(mGapBuffer.toString());
+        if (mLastSearchPattern.isEmpty()) {
+            postInvalidate();
+            return;
+        }
 
-        while (matcher.find()) {
-            mReplaceList.add(new Pair<Integer, Integer>(matcher.start(), matcher.end()));
+        try {
+            // OPTIMIZATION: Only find matches in and around the visible area for drawing
+            Rect clip = new Rect();
+            getDrawingRect(clip);
+            clip.offset(getScrollX(), getScrollY());
+
+            int startLine = getLogicalLineFromY(Math.max(0, clip.top - getHeight()));
+            int endLine = getLogicalLineFromY(clip.bottom + getHeight());
+
+            int startOffset = getLineStart(startLine);
+            int endOffset = getLineEnd(endLine);
+
+            Matcher matcher = Pattern.compile(mLastSearchPattern).matcher(mGapBuffer);
+            matcher.region(startOffset, endOffset);
+
+            while (matcher.find()) {
+                mReplaceList.add(new Pair<>(matcher.start(), matcher.end()));
+            }
+
+            // CRITICAL: Ensure the match containing the cursor is ALWAYS highlighted
+            int cursor = mCursorIndex;
+            Matcher cursorMatcher = Pattern.compile(mLastSearchPattern).matcher(mGapBuffer);
+            if (cursorMatcher.find(Math.max(0, cursor - 1000))) { // Search slightly before cursor
+                // Re-scan from the result to see if cursor is actually inside it
+                matcher.reset();
+                if (matcher.find(cursorMatcher.start()) && matcher.start() <= cursor && matcher.end() >= cursor) {
+                    boolean found = false;
+                    for (Pair<Integer, Integer> p : mReplaceList) {
+                        if (p.first == matcher.start()) {
+                            found = true;
+                            break;
+                        }
+                    }
+                    if (!found) {
+                        mReplaceList.add(new Pair<>(matcher.start(), matcher.end()));
+                        Collections.sort(mReplaceList, new Comparator<Pair<Integer, Integer>>() {
+                            @Override
+                            public int compare(Pair<Integer, Integer> a, Pair<Integer, Integer> b) {
+                                return Integer.compare(a.first, b.first);
+                            }
+                        });
+                    }
+                }
+            }
+
+        } catch (Exception e) {
+            // Invalid regex
+        }
+        postInvalidate();
+    }
+
+    public void previous() {
+        if (mLastSearchPattern.isEmpty()) return;
+
+        int startPos = getSelectionStart();
+        try {
+            Matcher matcher = Pattern.compile(mLastSearchPattern).matcher(mGapBuffer);
+            int lastMatchStart = -1;
+            int lastMatchEnd = -1;
+
+            // Search from beginning until we hit the current cursor
+            while (matcher.find()) {
+                if (matcher.start() >= startPos) break;
+                lastMatchStart = matcher.start();
+                lastMatchEnd = matcher.end();
+            }
+
+            // If no match before cursor, try to find the very last one in the file (wrap around)
+            if (lastMatchStart == -1) {
+                matcher.reset();
+                while (matcher.find()) {
+                    lastMatchStart = matcher.start();
+                    lastMatchEnd = matcher.end();
+                }
+            }
+
+            if (lastMatchStart != -1) {
+                recordHistory();
+                setCursorPosition(lastMatchEnd);
+                setSelection(lastMatchStart, lastMatchEnd);
+                recordHistory();
+                scrollToVisible();
+
+                // Update the visible highlights
+                find(mLastSearchPattern);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Search error", e);
         }
     }
 
-    // Replace first match
+    public void next() {
+        if (mLastSearchPattern.isEmpty()) return;
+
+        int startPos = getSelectionEnd();
+        try {
+            Matcher matcher = Pattern.compile(mLastSearchPattern).matcher(mGapBuffer);
+
+            // Find the first match AFTER the current cursor/selection
+            if (matcher.find(startPos)) {
+                recordHistory();
+                setCursorPosition(matcher.end());
+                setSelection(matcher.start(), matcher.end());
+                recordHistory();
+                scrollToVisible();
+            } else {
+                // Wrap around to the beginning
+                if (matcher.find(0)) {
+                    recordHistory();
+                    setCursorPosition(matcher.end());
+                    setSelection(matcher.start(), matcher.end());
+                    recordHistory();
+                    scrollToVisible();
+                }
+            }
+            // Refresh list for highlighting
+            find(mLastSearchPattern);
+        } catch (Exception e) {
+            Log.e(TAG, "Search error", e);
+        }
+    }
+
     public void replaceFirst(String replacement) {
         if (!mReplaceList.isEmpty() && isEditedMode) {
             int start = mReplaceList.get(0).first;
@@ -1770,354 +4864,207 @@ public class EditView extends View {
 
             int length = replacement.length();
             setCursorPosition(start + length);
-            adjustSelectRange(start + length, start + length);
+            setSelection(start + length, start + length);
 
-            // remove the first item
             mReplaceList.remove(0);
 
             int delta = start + length - end;
-            // do not use the find(regex) method to re-find
-            // recalculate replace list by index
+
             for (int i = 0; i < mReplaceList.size(); ++i) {
-                int first = (int) mReplaceList.get(i).first + delta;
-                int second = (int) mReplaceList.get(i).second + delta;
+                int first = mReplaceList.get(i).first + delta;
+                int second = mReplaceList.get(i).second + delta;
                 mReplaceList.set(i, new Pair<Integer, Integer>(first, second));
             }
         } else {
-            // if the replace Lists is empty
-            // set the select mode false
             isSelectMode = false;
         }
         postInvalidate();
     }
 
-    // Replace all matches iteratively
     public void replaceAll(String replacement) {
         while (!mReplaceList.isEmpty() && isEditedMode) {
             replaceFirst(replacement);
         }
     }
 
-    // ---------- Cursor positioning ----------
-    // Goto line number (1-based)
-    public void gotoLine(int line) {
-        line = Math.min(Math.max(line, 1), getLineCount());
+    private int findMatchingBrace(int index) {
+        if (index < 0 || index >= mGapBuffer.length()) return -1;
+        char c = mGapBuffer.charAt(index);
+        int direction;
+        char matchChar;
+        if (c == '{') {
+            direction = 1;
+            matchChar = '}';
+        } else if (c == '}') {
+            direction = -1;
+            matchChar = '{';
+        } else if (c == '(') {
+            direction = 1;
+            matchChar = ')';
+        } else if (c == ')') {
+            direction = -1;
+            matchChar = '(';
+        } else if (c == '[') {
+            direction = 1;
+            matchChar = ']';
+        } else if (c == ']') {
+            direction = -1;
+            matchChar = '[';
+        } else return -1;
 
-        // Clear any active selection to cancel it before navigating
-        if (isSelectMode) {
-            clearSelectionMenu();
-        }
+        int depth = 0;
+        int i = index;
 
-        mCursorIndex = getLineStart(line);
-        mCursorLine = line;
-        mCursorPosX = getLeftSpace();
-        mCursorPosY = (line - 1) * getLineHeight();
+        // Robust scanner that skips strings and comments (Java/Smali style)
+        // Background search allows us to increase this significantly (e.g. 100 million chars)
+        int maxSearch = 100000000;
+        int steps = 0;
 
-        smoothScrollTo(0, Math.max(line * getLineHeight() - getHeight() + getLineHeight() * 2, 0));
-        postInvalidate(); // Ensure immediate redraw after clearing selection
-    }
+        while (i >= 0 && i < mGapBuffer.length() && steps < maxSearch) {
+            steps++;
+            char curr = mGapBuffer.charAt(i);
 
-    // Check undo available
-    public boolean canUndo() {
-        return mGapBuffer.canUndo();
-    }
-
-    // Check redo available
-    public boolean canRedo() {
-        return mGapBuffer.canRedo();
-    }
-
-    // Undo operation and restore cursor
-    public void undo() {
-        int index = mGapBuffer.undo();
-        if (index >= 0) {
-            mCursorIndex = index;
-            mCursorLine = getOffsetLine(index);
-            adjustCursorPosition();
-            onTextChanged();
-            scrollToVisable();
-
-            // restore selection (GapBuffer exposes the snapshot)
-            int s = mGapBuffer.getLastUndoSelectionStart();
-            int e = mGapBuffer.getLastUndoSelectionEnd();
-            boolean mode = mGapBuffer.getLastUndoSelectionMode();
-
-            if (s >= 0 && e >= 0) {
-                selectionStart = Math.max(0, Math.min(s, mGapBuffer.length()));
-                selectionEnd = Math.max(0, Math.min(e, mGapBuffer.length()));
-                isSelectMode = mode;
-                updateSelectionHandles();
-            } else {
-                // no selection snapshot stored for this undo — clear selection
-                isSelectMode = false;
-                selectionStart = selectionEnd = -1;
-            }
-            postInvalidate();
-        }
-    }
-
-    // Redo operation and restore cursor
-    public void redo() {
-        int index = mGapBuffer.redo();
-        if (index >= 0) {
-            mCursorIndex = index;
-            mCursorLine = getOffsetLine(index);
-            adjustCursorPosition();
-            onTextChanged();
-            scrollToVisable();
-
-            // restore selection for redo
-            int s = mGapBuffer.getLastRedoSelectionStart();
-            int e = mGapBuffer.getLastRedoSelectionEnd();
-            boolean mode = mGapBuffer.getLastRedoSelectionMode();
-
-            if (s >= 0 && e >= 0) {
-                selectionStart = Math.max(0, Math.min(s, mGapBuffer.length()));
-                selectionEnd = Math.max(0, Math.min(e, mGapBuffer.length()));
-                isSelectMode = mode;
-                updateSelectionHandles();
-            } else {
-                isSelectMode = false;
-                selectionStart = selectionEnd = -1;
-            }
-            postInvalidate();
-        }
-    }
-
-    // ---------- Selection handle updates ----------
-    // Update selection handle screen coordinates and caret
-    private void updateSelectionHandles() {
-        if (!isSelectMode) return;
-
-        int left = getLeftSpace();
-
-        // Start handle
-        int startLine = getOffsetLine(selectionStart);
-        int lineStart = getLineStart(startLine);
-        String startText = mGapBuffer.substring(lineStart, Math.min(selectionStart, mGapBuffer.length()));
-        selectHandleLeftX = left + (int) mTextPaint.measureText(startText);
-        selectHandleLeftY = startLine * getLineHeight();
-
-        // End handle
-        int endLine = getOffsetLine(selectionEnd);
-        lineStart = getLineStart(endLine);
-        String endText = mGapBuffer.substring(lineStart, Math.min(selectionEnd, mGapBuffer.length()));
-        selectHandleRightX = left + (int) mTextPaint.measureText(endText);
-        selectHandleRightY = endLine * getLineHeight();
-
-        // Update middle handle position
-        mCursorPosX = (selectHandleLeftX + selectHandleRightX) / 2;
-        mCursorPosY = (selectHandleLeftY + selectHandleRightY) / 2;
-    }
-
-    // Adjust cursor's screen coordinates based on mCursorLine and mCursorIndex
-    private void adjustCursorPosition() {
-        int start = getLineStart(mCursorLine);
-        String text = mGapBuffer.substring(start, mCursorIndex);
-
-        // Use precise text measurement with the current text paint
-        mCursorPosX = getLeftSpace() + (int) mTextPaint.measureText(text);
-        mCursorPosY = (mCursorLine - 1) * getLineHeight();
-
-        // Ensure cursor stays within bounds
-        if (mCursorPosX < getLeftSpace()) {
-            mCursorPosX = getLeftSpace();
-        }
-    }
-
-    // Adjust selected range and update handles
-    public void adjustSelectRange(int start, int end) {
-        selectionStart = start;
-        selectionEnd = end;
-        updateSelectionHandles(); // Call the new method
-        onCursorOrSelectionChanged();
-    }
-
-    // ---------- Auto-indent ----------
-    // Get current line's leading whitespace for auto-indent
-    private String getAutoIndent() {
-        if (!mAutoIndentEnabled || mCursorIndex == 0) return "";
-
-        try {
-            // Find the start of current line
-            int lineStart = getLineStart(mCursorLine);
-            if (lineStart < 0 || lineStart >= mGapBuffer.length()) return "";
-
-            String currentLine = mGapBuffer.substring(lineStart, Math.min(mCursorIndex, mGapBuffer.length()));
-
-            // Count leading spaces/tabs
-            StringBuilder indent = new StringBuilder();
-            for (int i = 0; i < currentLine.length(); i++) {
-                char c = currentLine.charAt(i);
-                if (c == ' ' || c == '\t') {
-                    indent.append(c);
-                } else {
-                    break;
-                }
-            }
-
-            return indent.toString();
-        } catch (Exception e) {
-            Log.e(TAG, "Error in getAutoIndent: " + e.getMessage());
-            return "";
-        }
-    }
-
-    // Set cursor position by index and adjust coordinates
-    private void setCursorPosition(int index) {
-        // calculate the cursor index and position
-        mCursorIndex = index;
-        mCursorLine = getOffsetLine(index);
-
-        String text = mGapBuffer.substring(getLineStart(mCursorLine), index);
-        int width = measureText(text);
-        mCursorPosX = getLeftSpace() + width;
-        mCursorPosY = (mCursorLine - 1) * getLineHeight();
-    }
-
-    // Set selection of texts from start to end
-    private void setSelection(int start, int end) {
-        selectionStart = Math.max(0, Math.min(start, mGapBuffer.length()));
-        selectionEnd = Math.max(0, Math.min(end, mGapBuffer.length()));
-        isSelectMode = true;
-        mHandleMiddleVisable = false;
-        updateSelectionHandles();
-    }
-
-    // Set cursor position by pixel coordinates and compute nearest index
-    public void setCursorPosition(float x, float y) {
-        // calculation the cursor y coordinate
-        mCursorPosY = (int) y / getLineHeight() * getLineHeight();
-        int bottom = getLineCount() * getLineHeight();
-
-        if (mCursorPosY < getPaddingTop())
-            mCursorPosY = getPaddingTop();
-
-        if (mCursorPosY > bottom - getLineHeight())
-            mCursorPosY = bottom - getLineHeight();
-
-        // estimate the cursor x position
-        int left = getLeftSpace();
-
-        int prev = left;
-        int next = left;
-
-        mCursorLine = mCursorPosY / getLineHeight() + 1;
-        mCursorIndex = getLineStart(mCursorLine);
-
-        String text = getLine(mCursorLine);
-        int length = text.length();
-
-        float[] widths = new float[length];
-        mTextPaint.getTextWidths(text, widths);
-
-        for (int i = 0; next < x && i < length; ++i) {
-            if (i > 0) {
-                prev += widths[i - 1];
-            }
-            next += widths[i];
-        }
-        onCursorOrSelectionChanged();
-
-        // calculation the cursor x coordinate
-        if (Math.abs(x - prev) <= Math.abs(next - x)) {
-            mCursorPosX = prev;
-        } else {
-            mCursorPosX = next;
-        }
-
-        // calculation the cursor index
-        if (mCursorPosX > left) {
-            for (int j = 0; left < mCursorPosX && j < length; ++j) {
-                left += widths[j];
-                ++mCursorIndex;
-            }
-        }
-    }
-
-    // Called when cursor or selection changed (placeholder for external UI)
-    private void onCursorOrSelectionChanged() {
-        scheduleSelectionUpdate();
-        // Auto-hide after 5 seconds if no interaction
-        if (mClipboardPanel != null) {
-            mSelectionHandler.removeCallbacks(mAutoHideRunnable);
-            mSelectionHandler.postDelayed(mAutoHideRunnable, 5000); // 5 seconds
-        }
-    }
-
-    // ---------- Autocomplete / Word extraction ----------
-    // Update word set from buffer asynchronously
-    private void updateWordSet() {
-        removeCallbacks(mWordUpdateRunnable);
-        if (!isEditedMode) return;
-
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
-                // Off UI for large files
-                String fullText = mGapBuffer.toString();
-                final Set<String> words = new HashSet<>();
-                java.util.regex.Matcher matcher = WORD_PATTERN.matcher(fullText);
-
-                while (matcher.find()) {
-                    String word = matcher.group();
-                    if (word.length() >= MIN_WORD_LEN) {
-                        words.add(word);
+            if (direction == 1) { // Forward Search
+                // Skip strings
+                if (curr == '"' || curr == '\'') {
+                    char quote = curr;
+                    i++;
+                    while (i < mGapBuffer.length()) {
+                        char c2 = mGapBuffer.charAt(i);
+                        if (c2 == '\\') {
+                            i++;
+                        } else if (c2 == quote) {
+                            break;
+                        } else if (c2 == '\n') {
+                            break;
+                        }
+                        i++;
                     }
                 }
+                // Skip line comments
+                else if (curr == '/' && i + 1 < mGapBuffer.length() && mGapBuffer.charAt(i + 1) == '/') {
+                    while (i < mGapBuffer.length() && mGapBuffer.charAt(i) != '\n') i++;
+                } else if (curr == '#') {
+                    while (i < mGapBuffer.length() && mGapBuffer.charAt(i) != '\n') i++;
+                }
+                // Skip block comments
+                else if (curr == '/' && i + 1 < mGapBuffer.length() && mGapBuffer.charAt(i + 1) == '*') {
+                    i += 2;
+                    while (i + 1 < mGapBuffer.length()) {
+                        if (mGapBuffer.charAt(i) == '*' && mGapBuffer.charAt(i + 1) == '/') {
+                            i++;
+                            break;
+                        }
+                        i++;
+                    }
+                } else {
+                    if (curr == c) depth++;
+                    else if (curr == matchChar) depth--;
+                }
+            } else { // Backward Search
+                // In backward search, we simply check depth but then verify if the result
+                // is inside a comment/string on its line.
+                if (curr == c) depth++;
+                else if (curr == matchChar) depth--;
 
-                post(new Runnable() {
-                    @Override
-                    public void run() {
-                        // Back to UI
-                        mWordSet = words;
-                        if (!mCurrentPrefix.isEmpty()) {
-                            showAutoComplete(mCurrentPrefix);
+                if (depth == 0) {
+                    // Verification of the matched candidate
+                    int line = getOffsetLine(i);
+                    int lineStart = getLineStart(line);
+                    String lineText = getLine(line);
+                    int offsetInLine = i - lineStart;
+
+                    boolean inComment = false;
+                    boolean inString = false;
+                    char q = 0;
+                    for (int j = 0; j < offsetInLine; j++) {
+                        char ch = lineText.charAt(j);
+                        if (inString) {
+                            if (ch == '\\') j++;
+                            else if (ch == q) inString = false;
+                        } else {
+                            if (ch == '"' || ch == '\'') {
+                                inString = true;
+                                q = ch;
+                            } else if (ch == '/' && j + 1 < lineText.length() && lineText.charAt(j + 1) == '/') {
+                                inComment = true;
+                                break;
+                            } else if (ch == '#') {
+                                inComment = true;
+                                break;
+                            }
                         }
                     }
-                });
+                    if (inComment || inString) {
+                        depth = -1; // mismatch found inside comment/string, keep going
+                    }
+                }
             }
-        }).start();
+
+            if (depth == 0) return i;
+            i += direction;
+        }
+        return -1;
     }
 
-    // Get the current identifier-like prefix near caret
     private String getCurrentPrefix() {
         if (mCursorIndex <= 0) return "";
 
-        // Don't convert entire buffer to string - work with the buffer directly
         int start = mCursorIndex;
-
-        // Move backwards to find the start of the word
         while (start > 0) {
             char prevChar = mGapBuffer.charAt(start - 1);
-            if (!(Character.isLetterOrDigit(prevChar) || prevChar == '_')) {
+            if (!isInstructionPart(prevChar)) {
                 break;
             }
             start--;
         }
 
-        // Extract only the needed substring
-        if (start < mCursorIndex) {
-            return mGapBuffer.substring(start, mCursorIndex);
+        if (start >= mCursorIndex) return "";
+
+        String prefix = mGapBuffer.substring(start, mCursorIndex);
+
+        // Reject trivial/ambiguous prefixes
+        if (prefix.equals("/") || prefix.equals("-") || prefix.equals("//")
+                || prefix.equals("--") || prefix.equals("_") || prefix.equals(".")) {
+            return "";
+        }
+        if ((prefix.startsWith("/") || prefix.startsWith("-") || prefix.startsWith("_"))
+                && prefix.length() < 2) {
+            return "";
         }
 
-        return "";
+        return prefix;
     }
 
-    // Filter word set and show suggestions
     private void filterAndShowSuggestions(String prefix) {
         if (prefix.isEmpty()) {
             dismissAutoComplete();
             return;
         }
-
+        final String lowerPrefix = prefix.toLowerCase();
         List<String> priorityList = new ArrayList<>();
         List<String> containsList = new ArrayList<>();
 
         for (String word : mWordSet) {
-            String lowerWord = word.toLowerCase();
-            String lowerPrefix = prefix.toLowerCase();
+            String langName = (mHighlighter != null) ? mHighlighter.getLanguageName() : null;
+            if (!"Smali".equalsIgnoreCase(langName)) {
+                break;
+            }
+            if (word.length() < prefix.length()) continue;
 
+            String lowerWord = word.toLowerCase();
+            if (lowerWord.startsWith(lowerPrefix) && !word.equals(prefix)) {
+                priorityList.add(word);
+            } else if (lowerWord.contains(lowerPrefix) && !word.equals(prefix)) {
+                containsList.add(word);
+            }
+        }
+
+        for (String word : mWordFrequencyMap.keySet()) {
+            if (word.length() < prefix.length()) continue;
+            if (mWordSet.contains(word)) continue;
+
+            String lowerWord = word.toLowerCase();
             if (lowerWord.startsWith(lowerPrefix) && !word.equals(prefix)) {
                 priorityList.add(word);
             } else if (lowerWord.contains(lowerPrefix) && !word.equals(prefix)) {
@@ -2133,78 +5080,116 @@ public class EditView extends View {
             return;
         }
 
-        // If list is already shown, just update silently
-        if (mAutoCompletePopup.isShowing()) {
-            mAutoCompleteAdapter.clear();
-            mAutoCompleteAdapter.addAll(suggestions);
-            mAutoCompleteAdapter.notifyDataSetChanged();
-        } else {
-            mAutoCompleteAdapter.clear();
-            mAutoCompleteAdapter.addAll(suggestions);
-            mAutoCompleteAdapter.notifyDataSetChanged();
-            showAutoComplete(prefix);
-        }
+        // Always update adapter if prefix changed to refresh highlighting
+        mAutoCompleteAdapter.setNotifyOnChange(false);
+        mAutoCompleteAdapter.clear();
+        mAutoCompleteAdapter.addAll(suggestions);
+        mAutoCompleteAdapter.notifyDataSetChanged();
+
+        showAutoComplete(prefix);
     }
 
-    // Show the autocomplete popup near the caret
     private void showAutoComplete(String prefix) {
-        Rect cursorRect = getBoundingBox(mCursorIndex);
+        if (!mAutoCompleteEnabled || prefix == null || prefix.isEmpty() || mAutoCompleteAdapter.isEmpty()) {
+            dismissAutoComplete();
+            return;
+        }
 
-        hideTextSelectionWindow();
+        // Anchor horizontally to the start of the word to prevent flickering while typing
+        int wordStartIdx = mCursorIndex - prefix.length();
+        Rect anchorRect = getBoundingBox(wordStartIdx);
 
-        // Calculate full width with margin
-        int margin = (int) (getResources().getDisplayMetrics().density * 8); // 8dp margin on each
-        // side
-        int popupWidth = getWidth() - (margin * 2);
+        if (mClipboardPanel != null && mClipboardPanel.isShowing()) {
+            hideTextSelectionWindow();
+        }
 
-        // Dynamically size the height — wrap up to 4 visible items
-        int itemHeight = (int) (getResources().getDisplayMetrics().density * 40); // ≈40dp per item
-        int visibleCount = Math.min(mAutoCompleteAdapter.getCount(), 4);
-        int popupHeight = visibleCount == 0 ? 0 : itemHeight * visibleCount;
-        if (popupHeight == 0) popupHeight = ListPopupWindow.WRAP_CONTENT;
+        int count = mAutoCompleteAdapter.getCount();
+        float density = getResources().getDisplayMetrics().density;
 
-        // If already visible, only update position and size — don’t recreate (prevents flicker)
-        if (mAutoCompletePopup.isShowing()) {
+        int viewWidth = getWidth();
+        int popupWidth = (int) (viewWidth * 0.85f);
+        int maxAllowedWidth = (int) (density * 400);
+        if (popupWidth > maxAllowedWidth) popupWidth = maxAllowedWidth;
+
+        // Position horizontally: anchor to word start but ensure it fits on screen
+        int horizontalOffset = anchorRect.left;
+        if (horizontalOffset + popupWidth > viewWidth) {
+            horizontalOffset = viewWidth - popupWidth - (int) (density * 16);
+        }
+        horizontalOffset = Math.max(0, horizontalOffset);
+
+        int itemHeight = (int) (density * 40);
+        int visibleCount = Math.min(count, 3);
+        int popupHeight = itemHeight * visibleCount;
+
+        int verticalOffset = anchorRect.bottom - getHeight();
+
+        boolean isShowing = mAutoCompletePopup.isShowing();
+
+        // only refresh window if it actually needs to move line or change size
+        // Anchoring to word start means horizontalOffset stays constant while typing the same word.
+        boolean moved = isShowing && (mAutoCompletePopup.getVerticalOffset() != verticalOffset ||
+                Math.abs(mAutoCompletePopup.getHorizontalOffset() - horizontalOffset) > density * 5);
+        boolean resized = isShowing && (mAutoCompletePopup.getHeight() != popupHeight);
+
+        if (!isShowing || moved || resized) {
+            mAutoCompletePopup.setWidth(popupWidth);
             mAutoCompletePopup.setHeight(popupHeight);
-            mAutoCompleteAdapter.notifyDataSetChanged();
-            return;
+            mAutoCompletePopup.setHorizontalOffset(horizontalOffset);
+            mAutoCompletePopup.setVerticalOffset(verticalOffset);
+
+            if (!isShowing) {
+                mAutoCompletePopup.setModal(false);
+                mAutoCompletePopup.setAnimationStyle(0); // No animation
+                mAutoCompletePopup.setBackgroundDrawable(
+                        getResources().getDrawable(android.R.drawable.dialog_holo_light_frame)
+                );
+            }
+            mAutoCompletePopup.show();
         }
 
-        // Configure initial show
-        mAutoCompletePopup.setWidth(popupWidth);
-        mAutoCompletePopup.setHeight(popupHeight);
-        mAutoCompletePopup.setAnchorView(this);
-        mAutoCompletePopup.setModal(false); // Allow typing
-        mAutoCompletePopup.setBackgroundDrawable(
-                getResources().getDrawable(android.R.drawable.dialog_holo_light_frame)
-        );
-
-        // Offset popup slightly below cursor, centered with margins
-        mAutoCompletePopup.setHorizontalOffset(margin);
-        mAutoCompletePopup.setVerticalOffset(cursorRect.bottom + (int) (getLineHeight() * 0.6f));
-
-        mAutoCompletePopup.show();
-        mCurrentPrefix = prefix;
+        // Ensure the cursor and the autocomplete popup are visible
+        int popupBottom = anchorRect.bottom + popupHeight;
+        int viewBottom = getHeight();
+        if (popupBottom > viewBottom) {
+            smoothScrollBy(0, popupBottom - viewBottom + (int) (density * 16));
+        } else {
+            scrollToVisible();
+        }
     }
 
-    // Replace current prefix with a chosen completion
     private void replacePrefixWithWord(String fullWord) {
-        String prefix = getCurrentPrefix();
-        if (prefix.isEmpty()) {
-            insertText(fullWord); // Insert if no prefix
-            return;
+        int[] bounds = getWordBoundsAt(mCursorIndex);
+        int start, end;
+        if (bounds != null) {
+            start = bounds[0];
+            end = bounds[1];
+        } else {
+            String prefix = getCurrentPrefix();
+            start = mCursorIndex - prefix.length();
+            end = mCursorIndex;
         }
 
-        int prefixStart = mCursorIndex - prefix.length();
-        mGapBuffer.replace(prefixStart, mCursorIndex, fullWord, true); // Replace via GapBuffer
-        mCursorIndex = prefixStart + fullWord.length();
+        int oldLine = mCursorLine;
+
+        mGapBuffer.beginBatchEdit();
+        mGapBuffer.replace(start, end, fullWord, true);
+        mGapBuffer.endBatchEdit();
+
+        // Clear any active composing state from IME
+        mComposingStart = -1;
+        mComposingEnd = -1;
+
+        mCursorIndex = start + fullWord.length();
+        mCursorLine = getOffsetLine(mCursorIndex);
+
         adjustCursorPosition();
-        scrollToVisable();
+        scrollToVisible();
+        onCursorOrSelectionChanged(); // This notifies IMM
         postInvalidate();
-        onTextChanged();
+        onTextChanged(oldLine);
     }
 
-    // Dismiss autocomplete popup
     private void dismissAutoComplete() {
         if (mAutoCompletePopup.isShowing()) {
             mAutoCompletePopup.dismiss();
@@ -2212,29 +5197,82 @@ public class EditView extends View {
         mCurrentPrefix = "";
     }
 
-    // ---------- Selection UI / Clipboard Panel ----------
-    // Placeholder: show text selection window (clipboard panel)
-    public void showTextSelectionWindow() {
-        if (mClipboardPanel != null && (isSelectMode || mHandleMiddleVisable)) {
+    private void showMagnifier(float x, float y) {
+        if (!mMagnifierEnabled || mMagnifier == null) return;
+        try {
+            hideTextSelectionWindow();
+
+            // Magnifier should focus on the text, so if y is bottom of a line/handle,
+            // we adjust it to the middle of the line.
+            float adjustedX = x - getScrollX() + getPaddingLeft();
+            float adjustedY = y - getScrollY() + getPaddingTop() - getLineHeight() * 0.5f;
+
+            adjustedX = Math.max(0, Math.min(adjustedX, getWidth()));
+            adjustedY = Math.max(0, Math.min(adjustedY, getHeight()));
+
+            mMagnifier.show(adjustedX, adjustedY);
+            mMagnifierX = adjustedX;
+            mMagnifierY = adjustedY;
+            mIsMagnifierShowing = true;
+        } catch (Exception e) {
+            Log.e(TAG, "Error showing magnifier: " + e.getMessage());
+            dismissMagnifier();
+        }
+    }
+
+    private void updateMagnifier(float x, float y) {
+        if (!mIsMagnifierShowing || !mMagnifierEnabled || mMagnifier == null) return;
+        try {
+            float adjustedX = x - getScrollX() + getPaddingLeft();
+            float adjustedY = y - getScrollY() + getPaddingTop() - getLineHeight() * 0.5f;
+
+            adjustedX = Math.max(0, Math.min(adjustedX, getWidth()));
+            adjustedY = Math.max(0, Math.min(adjustedY, getHeight()));
+
+            // Smoother threshold: only update if moved significantly or if always updating for MT vibe
+            if (Math.abs(adjustedX - mMagnifierX) >= 0.1f || Math.abs(adjustedY - mMagnifierY) >= 0.1f) {
+                mMagnifier.show(adjustedX, adjustedY);
+                mMagnifierX = adjustedX;
+                mMagnifierY = adjustedY;
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error updating magnifier: " + e.getMessage());
+            dismissMagnifier();
+        }
+    }
+
+    private void dismissMagnifier() {
+        if (mIsMagnifierShowing && mMagnifier != null) {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                try {
+                    mMagnifier.dismiss();
+                    mIsMagnifierShowing = false;
+                } catch (Exception e) {
+                    Log.e(TAG, "Error dismissing magnifier: " + e.getMessage());
+                }
+            }
+        }
+    }
+
+    public void showTextSelectionWindow(Rect targetRect) {
+        if (mClipboardPanel != null && (isSelectMode || mHandleMiddleVisible)) {
             post(new Runnable() {
                 @Override
                 public void run() {
-                    Rect optimalRect = getOptimalClipboardPosition();
-                    mClipboardPanel.showAtLocation(optimalRect);
-
-                    // Schedule auto-hide
+                    mClipboardPanel.showAtLocation(targetRect);
                     scheduleAutoHide();
                 }
             });
         }
     }
 
-    // Hide text selection window (clipboard panel)
+    public void showTextSelectionWindow() {
+        showTextSelectionWindow(null);
+    }
+
     public void hideTextSelectionWindow() {
         if (mClipboardPanel != null) {
-            // Cancel any pending auto-hide
             mSelectionHandler.removeCallbacks(mAutoHideRunnable);
-
             post(new Runnable() {
                 @Override
                 public void run() {
@@ -2244,144 +5282,62 @@ public class EditView extends View {
         }
     }
 
-    // Schedule auto-hide for selection UI
     private void scheduleAutoHide() {
         mSelectionHandler.removeCallbacks(mAutoHideRunnable);
-        if (!isSelectMode && !mHandleMiddleVisable) {
-            mSelectionHandler.postDelayed(mAutoHideRunnable, 3000); // 3 seconds for normal taps
-        } else {
-            mSelectionHandler.postDelayed(mAutoHideRunnable, 5000); // 5 seconds for selections
-        }
+        mSelectionHandler.postDelayed(mAutoHideRunnable, 4000);
     }
 
-    private Rect getOptimalClipboardPosition() {
-        if (isSelectMode) {
-            // For selections, position near the middle using your direct variables
-            int middle = (selectionStart + selectionEnd) / 2;
-            Rect middleRect = getBoundingBox(middle);
-            if (middleRect != null) {
-                // Position above selection middle
-                middleRect.top -= getLineHeight() * 3;
-                middleRect.bottom = middleRect.top + getLineHeight();
-                return middleRect;
+    private void batchReplaceWithSelectionSnapshot(int replaceStart, int replaceEnd, String text,
+                                                   boolean wasSelectBefore, int selBeforeStart, int selBeforeEnd,
+                                                   boolean setSelectionAfter, int selAfterStart, int selAfterEnd) {
+        mGapBuffer.markSelectionBefore(selBeforeStart, selBeforeEnd, wasSelectBefore);
+        mGapBuffer.beginBatchEdit();
+        try {
+            mGapBuffer.replace(replaceStart, replaceEnd, text, true);
+            if (setSelectionAfter) {
+                setSelection(selAfterStart, selAfterEnd);
+                mGapBuffer.markSelectionAfter(selAfterStart, selAfterEnd, true);
+            } else {
+                mGapBuffer.markSelectionAfter(-1, -1, false);
             }
+        } finally {
+            mGapBuffer.endBatchEdit();
         }
-
-        // For cursor, position above cursor
-        Rect cursorRect = getBoundingBox(mCursorIndex);
-        if (cursorRect != null) {
-            cursorRect.top -= getLineHeight() * 3;
-            cursorRect.bottom = cursorRect.top + getLineHeight();
-            return cursorRect;
-        }
-
-        return null; // Let ClipboardPanel calculate automatically
     }
 
-    @Override
-    protected void onFocusChanged(boolean gainFocus, int direction, Rect previouslyFocusedRect) {
-        super.onFocusChanged(gainFocus, direction, previouslyFocusedRect);
-        if (!gainFocus) dismissAutoComplete();
-    }
-
-    @Override
-    protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-
-        super.onMeasure(widthMeasureSpec, heightMeasureSpec);
-
-        setMeasuredDimension(MeasureSpec.getSize(widthMeasureSpec),
-        MeasureSpec.getSize(heightMeasureSpec));
-    }
-
-    // ---------- Gesture related helpers ----------
-    // Auto scroll select handle and cursor when dragging near edge
-    private void onMove(int slopX, int slopY) {
-        int dx = 0;
-
-        if (mGapBuffer == null || mGapBuffer.length() == 0) {
-            return;
-        }
-
-        if (mCursorPosX - getScrollX() <= slopX) {
-            if (mCursorIndex > 0 && mCursorIndex - 1 < mGapBuffer.length()) {
-                try {
-                    char prevChar = mGapBuffer.charAt(mCursorIndex - 1);
-                    dx = -measureText(String.valueOf(prevChar));
-                } catch (Exception e) {
-                    dx = -spaceWidth;
-                }
+    private void batchDeleteWithSelectionSnapshot(int delStart, int delEnd,
+                                                  boolean wasSelectBefore, int selBeforeStart, int selBeforeEnd,
+                                                  boolean setSelectionAfter, int selAfterStart, int selAfterEnd) {
+        mGapBuffer.markSelectionBefore(selBeforeStart, selBeforeEnd, wasSelectBefore);
+        mGapBuffer.beginBatchEdit();
+        try {
+            mGapBuffer.delete(delStart, delEnd, true);
+            if (setSelectionAfter) {
+                setSelection(selAfterStart, selAfterEnd);
+                mGapBuffer.markSelectionAfter(selAfterStart, selAfterEnd, true);
+            } else {
+                mGapBuffer.markSelectionAfter(-1, -1, false);
             }
-        } else if (mCursorPosX - getScrollX() >= screenWidth - slopX) {
-            if (mCursorIndex >= 0 && mCursorIndex < mGapBuffer.length()) {
-                try {
-                    char nextChar = mGapBuffer.charAt(mCursorIndex);
-                    dx = measureText(String.valueOf(nextChar));
-                } catch (Exception e) {
-                    dx = spaceWidth;
-                }
-            } else if (mCursorIndex == mGapBuffer.length()) {
-                dx = spaceWidth;
-            }
-        }
-
-        if (getHeight() > screenHeight / 2) {
-            slopY = slopY * 3;
-        }
-
-        int dy = 0;
-        if (mCursorPosY - getScrollY() <= 0) {
-            dy = -getLineHeight();
-        } else if (mCursorPosY - getScrollY() >= getHeight() - slopY) {
-            dy = getLineHeight();
-        }
-
-        int newScrollX = getScrollX() + dx;
-        int newScrollY = getScrollY() + dy;
-
-        newScrollX = Math.max(0, Math.min(newScrollX, getMaxScrollX()));
-        newScrollY = Math.max(0, Math.min(newScrollY, getMaxScrollY()));
-
-        smoothScrollTo(newScrollX, newScrollY);
-
-        // Update magnifier during auto-scroll
-        if (mIsMagnifierShowing && mMagnifierEnabled) {
-            updateMagnifier(mCursorPosX, mCursorPosY + getLineHeight());
+        } finally {
+            mGapBuffer.endBatchEdit();
         }
     }
 
-    // ---------- Gesture listener inner class ----------
+    public interface OnSelectionChangeListener {
+        void onSelectionChanged(int start, int end);
+    }
+
     class GestureListener extends GestureDetector.SimpleOnGestureListener {
 
-        private boolean touchOnSelectHandleMiddle = false;
-        private boolean touchOnSelectHandleLeft = false;
-        private boolean touchOnSelectHandleRight = false;
-
+        boolean touchOnSelectHandleMiddle = false;
+        boolean touchOnSelectHandleLeft = false;
+        boolean touchOnSelectHandleRight = false;
         private boolean mIsMagnifierActive = false;
 
-        private int mInitialLine = -1;
-
-        // for auto scroll select handle
-        private Runnable moveAction = new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    if (mIsMagnifierActive && mMagnifierEnabled) {
-                        // Use cursor position for magnifier
-                        updateMagnifier(mCursorPosX, mCursorPosY + getLineHeight());
-                    }
-                    onMove(spaceWidth * 4, getLineHeight());
-                    if (EditView.this.isAttachedToWindow()) {
-                        postDelayed(moveAction, DEFAULT_DURATION);
-                    }
-                } catch (Exception e) {
-                    Log.e(TAG, "Error in moveAction: " + e.getMessage());
-                    dismissMagnifier();
-                }
-            }
-        };
-
-        // Swap left/right select handle coordinates and selection indices
         private void reverse() {
+            int start = getSelectionStart();
+            int end = getSelectionEnd();
+
             selectHandleLeftX = selectHandleLeftX ^ selectHandleRightX;
             selectHandleRightX = selectHandleLeftX ^ selectHandleRightX;
             selectHandleLeftX = selectHandleLeftX ^ selectHandleRightX;
@@ -2390,154 +5346,275 @@ public class EditView extends View {
             selectHandleRightY = selectHandleLeftY ^ selectHandleRightY;
             selectHandleLeftY = selectHandleLeftY ^ selectHandleRightY;
 
-            selectionStart = selectionStart ^ selectionEnd;
-            selectionEnd = selectionStart ^ selectionEnd;
-            selectionStart = selectionStart ^ selectionEnd;
+            setSelection(end, start);
 
             touchOnSelectHandleLeft = !touchOnSelectHandleLeft;
             touchOnSelectHandleRight = !touchOnSelectHandleRight;
         }
 
-        // when single tap to check the select region
         private boolean checkSelectRange(float x, float y) {
+            float internalY = y - getPaddingTop();
+            int selStart = getSelectionStart();
+            int selEnd = getSelectionEnd();
+            if (selStart == selEnd) return false;
 
-            if (y < selectHandleLeftY - getLineHeight() || y > selectHandleRightY)
+            // Normalize for hit-testing range
+            int s = Math.min(selStart, selEnd);
+            int e = Math.max(selStart, selEnd);
+
+            int startLine = getOffsetLine(s);
+            int endLine = getOffsetLine(e);
+
+            float slop = ScreenUtils.dip2px(getContext(), 12);
+
+            // Basic vertical filter with small slop
+            if (internalY < getLineTop(startLine) - slop || internalY > getLineBottom(endLine) + slop)
                 return false;
 
-            // on the same line
-            if (selectHandleLeftY == selectHandleRightY) {
-                if (x < selectHandleLeftX || x > selectHandleRightX)
-                    return false;
-            } else {
-                // not on the same line
-                int left = getLeftSpace();
-                int line = (int) y / getLineHeight() + 1;
-                int width = getLineWidth(line) + spaceWidth;
-                // select start line
-                if (line == selectHandleLeftY / getLineHeight()) {
-                    if (x < selectHandleLeftX || x > left + width)
-                        return false;
-                } else if (line == selectHandleRightY / getLineHeight()) {
-                    // select end line
-                    if (x < left || x > selectHandleRightX)
-                        return false;
+            int line = getLogicalLineFromY(internalY);
+            if (line < startLine || line > endLine) return false;
+
+            int left = getLeftSpace();
+            String lineText = getLine(line);
+            int lineStartIdx = getLineStart(line);
+            LineResult res = (mHighlighter != null) ? mHighlighter.getOrTokenize(line, lineText) : null;
+
+            if (mWordWrap && res != null && res.layout != null) {
+                int vLine = res.layout.getLineForVertical((int) (internalY - getLineTop(line)));
+                int vStartLayout = res.layout.getLineStart(vLine);
+                int vEndLayout = res.layout.getLineEnd(vLine);
+
+                // Map original selection offsets to layout offsets for this line
+                int offStart = Math.max(0, s - lineStartIdx);
+                int offEnd = Math.min(lineText.length(), e - lineStartIdx);
+
+                int layoutSelStart;
+                if (res.shiftMap != null) {
+                    if (offStart < res.shiftMap.length) {
+                        layoutSelStart = offStart + res.shiftMap[offStart];
+                    } else {
+                        layoutSelStart = offStart + (res.shiftMap.length > 0 ? res.shiftMap[res.shiftMap.length - 1] : 0);
+                    }
                 } else {
-                    if (x < left || x > left + width)
-                        return false;
+                    layoutSelStart = offStart;
+                }
+
+                int layoutSelEnd;
+                if (res.shiftMap != null) {
+                    if (offEnd < res.shiftMap.length) {
+                        layoutSelEnd = offEnd + res.shiftMap[offEnd];
+                    } else {
+                        layoutSelEnd = offEnd + (res.shiftMap.length > 0 ? res.shiftMap[res.shiftMap.length - 1] : 0);
+                    }
+                } else {
+                    layoutSelEnd = offEnd;
+                }
+
+                // If selection spans multiple lines, cap it for this visual line
+                int overlapStart = Math.max(vStartLayout, layoutSelStart);
+                int overlapEnd = Math.min(vEndLayout, layoutSelEnd);
+
+                // If selection ends on a future line, this visual line is selected till the end
+                if (e > lineStartIdx + lineText.length()) {
+                    overlapEnd = vEndLayout;
+                }
+                // If selection starts on a previous line, this visual line is selected from the start
+                if (s < lineStartIdx) {
+                    overlapStart = vStartLayout;
+                }
+
+                if (overlapStart >= overlapEnd && e <= lineStartIdx + lineText.length()) {
+                    // Check if it's hitting the newline area
+                    if (e > lineStartIdx + lineText.length() && vLine == res.layout.getLineCount() - 1) {
+                        float lastX = res.layout.getPrimaryHorizontal(vEndLayout);
+                        return x >= left + lastX - slop && x <= left + lastX + spaceWidth + slop;
+                    }
+                    return false;
+                }
+
+                float minX = res.layout.getPrimaryHorizontal(overlapStart);
+                float maxX = res.layout.getPrimaryHorizontal(overlapEnd);
+
+                float leftEdge = left + Math.min(minX, maxX);
+                float rightEdge = left + Math.max(minX, maxX);
+
+                // If it's the end of a line and selection continues, expand right edge
+                if (e > lineStartIdx + lineText.length() && overlapEnd == vEndLayout) {
+                    rightEdge += spaceWidth;
+                }
+
+                return x >= leftEdge - slop && x <= rightEdge + slop;
+            } else {
+                int overlapStart = Math.max(lineStartIdx, s);
+                int overlapEnd = Math.min(lineStartIdx + lineText.length(), e);
+                if (overlapStart >= overlapEnd) return false;
+
+                float sX = left + measureText(lineText.substring(0, overlapStart - lineStartIdx), left);
+                float eX = left + measureText(lineText.substring(0, overlapEnd - lineStartIdx), left);
+                return x >= sX - slop && x <= eX + slop;
+            }
+        }
+
+        private boolean isTouchOnHandleMiddle(float x, float y) {
+            if (!mHandleMiddleVisible) return false;
+            float slop = ScreenUtils.dip2px(getContext(), 2);
+            float internalX = x - getPaddingLeft();
+            float internalY = y - getPaddingTop();
+
+            float left = mCursorPosX - (float) handleMiddleWidth / 2;
+            float right = mCursorPosX + (float) handleMiddleWidth / 2;
+            float top = mCursorPosY + getLineHeight();
+            float bottom = top + handleMiddleHeight;
+            return internalX >= left - slop && internalX <= right + slop && internalY >= top - slop && internalY <= bottom + slop;
+        }
+
+        private boolean isTouchOnHandleLeft(float x, float y) {
+            if (!isSelectMode) return false;
+            float slop = ScreenUtils.dip2px(getContext(), 2);
+            float internalX = x - getPaddingLeft();
+            float internalY = y - getPaddingTop();
+
+            float left = selectHandleLeftX - selectHandleWidth + (float) selectHandleWidth / 4;
+            float right = selectHandleLeftX + (float) selectHandleWidth / 4;
+            float top = selectHandleLeftY;
+            float bottom = top + selectHandleHeight;
+            return internalX >= left - slop && internalX <= right + slop && internalY >= top - slop && internalY <= bottom + slop;
+        }
+
+        private boolean isTouchOnHandleRight(float x, float y) {
+            if (!isSelectMode) return false;
+            float slop = ScreenUtils.dip2px(getContext(), 2);
+            float internalX = x - getPaddingLeft();
+            float internalY = y - getPaddingTop();
+
+            float left = selectHandleRightX - (float) selectHandleWidth / 4;
+            float right = selectHandleRightX + selectHandleWidth - (float) selectHandleWidth / 4;
+            float top = selectHandleRightY;
+            float bottom = top + selectHandleHeight;
+            return internalX >= left - slop && internalX <= right + slop && internalY >= top - slop && internalY <= bottom + slop;
+        }        private final Runnable moveAction = new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    boolean scrolled = onMove();
+                    if (scrolled) {
+                        mAutoScrollFactor = Math.min(mAutoScrollFactor + 0.1f, 3f);
+                    } else {
+                        mAutoScrollFactor = 0f;
+                        if (mIsMagnifierActive && !mIsMagnifierShowing && mMagnifierEnabled) {
+                            showMagnifierForHandle();
+                        }
+                    }
+                    if (EditView.this.isAttachedToWindow() && (touchOnSelectHandleMiddle || touchOnSelectHandleLeft || touchOnSelectHandleRight)) {
+                        long delay = scrolled ? Math.max(25, 100 - (int) (mAutoScrollFactor * 25)) : 100;
+                        postDelayed(moveAction, delay);
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "Error in moveAction: " + e.getMessage());
+                    dismissMagnifier();
                 }
             }
-            return true;
+
+            private void showMagnifierForHandle() {
+                if (touchOnSelectHandleMiddle) {
+                    showMagnifier(mCursorPosX, mCursorPosY + getLineHeight());
+                } else if (touchOnSelectHandleLeft) {
+                    showMagnifier(selectHandleLeftX, selectHandleLeftY);
+                } else if (touchOnSelectHandleRight) {
+                    showMagnifier(selectHandleRightX, selectHandleRightY);
+                }
+            }
+        };
+
+        private boolean isTouchOnAnyHandle(float x, float y) {
+            return isTouchOnHandleMiddle(x, y) || isTouchOnHandleLeft(x, y) || isTouchOnHandleRight(x, y);
         }
 
         @Override
         public boolean onDown(MotionEvent e) {
+            mAutoScrollFactor = 0f;
             float x = e.getX() + getScrollX();
             float y = e.getY() + getScrollY();
 
-            // touch handle middle (show clipboard panel)
-            if (mHandleMiddleVisable &&
-                    x >= mCursorPosX - handleMiddleWidth / 2 &&
-                    x <= mCursorPosX + handleMiddleWidth / 2 &&
-                    y >= mCursorPosY + getLineHeight() &&
-                    y <= mCursorPosY + getLineHeight() + handleMiddleHeight) {
-
+            if (isTouchOnHandleMiddle(x, y)) {
                 touchOnSelectHandleMiddle = true;
                 removeCallbacks(blinkAction);
-                mCursorVisiable = mHandleMiddleVisable = true;
+                mCursorVisible = mHandleMiddleVisible = true;
 
-                // 🔹 Show clipboard panel exactly above this handle
                 showTextSelectionWindow();
 
-                // 🔹 Keep magnifier logic working
                 if (mMagnifierEnabled) {
                     mIsMagnifierActive = true;
                     showMagnifier(mCursorPosX, mCursorPosY + getLineHeight());
                 }
 
-                // ✅ Prevent cursor from moving or triggering a new position
                 return true;
             }
 
-            // touch handle left
-            if (isSelectMode && x >= selectHandleLeftX - selectHandleWidth + selectHandleWidth / 4
-                    && x <= selectHandleLeftX + selectHandleWidth / 4
-                    && y >= selectHandleLeftY && y <= selectHandleLeftY + selectHandleHeight) {
+            if (isTouchOnHandleLeft(x, y)) {
                 touchOnSelectHandleLeft = true;
                 removeCallbacks(blinkAction);
-                mCursorVisiable = mHandleMiddleVisable = false;
+                mCursorVisible = mHandleMiddleVisible = false;
 
                 showTextSelectionWindow();
                 if (mMagnifierEnabled) {
                     mIsMagnifierActive = true;
                     showMagnifier(selectHandleLeftX, selectHandleLeftY);
                 }
+                return true;
             }
-
-            // touch handle right
-            if (isSelectMode && x >= selectHandleRightX - selectHandleWidth / 4
-                    && x <= selectHandleRightX + selectHandleWidth - selectHandleWidth / 4
-                    && y >= selectHandleRightY && y <= selectHandleRightY + selectHandleHeight) {
+            if (isTouchOnHandleRight(x, y)) {
                 touchOnSelectHandleRight = true;
                 removeCallbacks(blinkAction);
-                mCursorVisiable = mHandleMiddleVisable = false;
+                mCursorVisible = mHandleMiddleVisible = false;
                 showTextSelectionWindow();
                 if (mMagnifierEnabled) {
                     mIsMagnifierActive = true;
                     showMagnifier(selectHandleRightX, selectHandleRightY);
                 }
+                return true;
             }
-
             return super.onDown(e);
         }
 
         @Override
-        public boolean onScroll(MotionEvent e1, MotionEvent e2, float distanceX, float distanceY) {
+        public boolean onScroll(@NonNull MotionEvent e1, @NonNull MotionEvent e2, float distanceX, float distanceY) {
             try {
                 float x = e2.getX() + getScrollX();
                 float y = e2.getY() + getScrollY();
 
-                if (mIsMagnifierActive && mMagnifierEnabled) {
-                    if (touchOnSelectHandleMiddle) {
-                        updateMagnifier(mCursorPosX, mCursorPosY + getLineHeight());
-                    } else if (touchOnSelectHandleLeft) {
-                        updateMagnifier(selectHandleLeftX, selectHandleLeftY);
-                    } else if (touchOnSelectHandleRight) {
-                        updateMagnifier(selectHandleRightX, selectHandleRightY);
-                    }
-                }
+                float dx = distanceX;
+                float dy = distanceY;
 
                 if (touchOnSelectHandleMiddle) {
-                    removeCallbacks(moveAction);
-                    post(moveAction);
-                    setCursorPosition(x, y - getLineHeight() - Math.min(getLineHeight(), selectHandleHeight) / 2);
+                    hideTextSelectionWindow();
+                    setCursorPosition(x, y - getLineHeight() - (float) Math.min(getLineHeight(), selectHandleHeight) / 2);
                 } else if (touchOnSelectHandleLeft) {
-                    removeCallbacks(moveAction);
-                    post(moveAction);
-                    setCursorPosition(x, y - getLineHeight() - Math.min(getLineHeight(), selectHandleHeight) / 2);
+                    hideTextSelectionWindow();
+                    setCursorPosition(x, y - getLineHeight() - (float) Math.min(getLineHeight(), selectHandleHeight) / 2);
                     selectHandleLeftX = mCursorPosX;
                     selectHandleLeftY = mCursorPosY + getLineHeight();
-                    selectionStart = mCursorIndex;
+                    setSelection(mCursorIndex, getSelectionEnd());
                 } else if (touchOnSelectHandleRight) {
-                    removeCallbacks(moveAction);
-                    post(moveAction);
-                    setCursorPosition(x, y - getLineHeight() - Math.min(getLineHeight(), selectHandleHeight) / 2);
+                    hideTextSelectionWindow();
+                    setCursorPosition(x, y - getLineHeight() - (float) Math.min(getLineHeight(), selectHandleHeight) / 2);
                     selectHandleRightX = mCursorPosX;
                     selectHandleRightY = mCursorPosY + getLineHeight();
-                    selectionEnd = mCursorIndex;
+                    setSelection(getSelectionStart(), mCursorIndex);
                 } else {
-                    if (Math.abs(distanceY) > Math.abs(distanceX))
-                        distanceX = 0;
+                    if (Math.abs(dy) > Math.abs(dx))
+                        dx = 0;
                     else
-                        distanceY = 0;
+                        dy = 0;
 
-                    int newX = (int) distanceX + getScrollX();
+                    int newX = (int) dx + getScrollX();
                     if (newX < 0) {
                         newX = 0;
                     } else if (newX > getMaxScrollX()) {
                         newX = getMaxScrollX();
                     }
 
-                    int newY = (int) distanceY + getScrollY();
+                    int newY = (int) dy + getScrollY();
                     if (newY < 0) {
                         newY = 0;
                     } else if (newY > getMaxScrollY()) {
@@ -2546,8 +5623,32 @@ public class EditView extends View {
                     smoothScrollTo(newX, newY);
                 }
 
+                if (touchOnSelectHandleMiddle || touchOnSelectHandleLeft || touchOnSelectHandleRight) {
+                    // Just make sure moveAction is scheduled if not already
+                    removeCallbacks(moveAction);
+                    post(moveAction);
+                }
+
+                if (mIsMagnifierActive && mMagnifierEnabled && mAutoScrollFactor <= 0.8f) {
+                    if (touchOnSelectHandleMiddle) {
+                        float clampedX = Math.min(x, getLeftSpace() + getLineWidth(mCursorLine) + spaceWidth);
+                        clampedX = Math.max(clampedX, (float) getLeftSpace());
+                        updateMagnifier(clampedX, mCursorPosY + getLineHeight());
+                    } else if (touchOnSelectHandleLeft) {
+                        int leftLine = getOffsetLine(getSelectionStart());
+                        float clampedX = Math.min(x, getLeftSpace() + getLineWidth(leftLine) + spaceWidth);
+                        clampedX = Math.max(clampedX, (float) getLeftSpace());
+                        updateMagnifier(clampedX, selectHandleLeftY);
+                    } else if (touchOnSelectHandleRight) {
+                        int rightLine = getOffsetLine(getSelectionEnd());
+                        float clampedX = Math.min(x, getLeftSpace() + getLineWidth(rightLine) + spaceWidth);
+                        clampedX = Math.max(clampedX, (float) getLeftSpace());
+                        updateMagnifier(clampedX, selectHandleRightY);
+                    }
+                }
+
                 if (isSelectMode && ((selectHandleLeftY > selectHandleRightY)
-                                || (selectHandleLeftY == selectHandleRightY && selectHandleLeftX > selectHandleRightX))) {
+                        || (selectHandleLeftY == selectHandleRightY && selectHandleLeftX > selectHandleRightX))) {
                     reverse();
                 }
 
@@ -2556,7 +5657,6 @@ public class EditView extends View {
                 dismissMagnifier();
                 mIsMagnifierActive = false;
                 removeCallbacks(moveAction);
-                Log.e(TAG, "Error in onScroll: " + e.getMessage());
             }
             return super.onScroll(e1, e2, distanceX, distanceY);
         }
@@ -2565,41 +5665,56 @@ public class EditView extends View {
         public boolean onSingleTapUp(MotionEvent e) {
             float x = e.getX() + getScrollX();
             float y = e.getY() + getScrollY();
+
+            // Clear composing state when user taps to move cursor
+            mComposingStart = -1;
+            mComposingEnd = -1;
+
             if (isEditedMode) {
                 showSoftInput(true);
             }
 
-            showTextSelectionWindow();
-            if (!isSelectMode || !checkSelectRange(x, y)) {
-                // stop cursor blink
+            boolean hitHandle = isTouchOnAnyHandle(x, y);
+            // Recovery: prevent cancellation of selection when tapping inside selected region
+            boolean hitSelection = isSelectMode && checkSelectRange(x, y);
+
+            if (!hitHandle && !hitSelection) {
                 removeCallbacks(blinkAction);
-                mCursorVisiable = mHandleMiddleVisable = true;
-                isSelectMode = false;
+                mCursorVisible = mHandleMiddleVisible = true;
 
                 if (!mReplaceList.isEmpty())
                     mReplaceList.clear();
 
                 setCursorPosition(x, y);
-                postInvalidate();
-                mLastTapTime = System.currentTimeMillis();
-                // clear long selection process
+                // Sync the clear selection to the buffer
+                setSelection(mCursorIndex, mCursorIndex);
+
+                mHideSelectHandles = false;
                 clearLineSelection();
-                // cursor start blink
+                postInvalidate();
+                // Ensure the tapped position is visible
+                scrollToVisible();
+                mLastTapTime = System.currentTimeMillis();
                 postDelayed(blinkAction, BLINK_TIMEOUT);
+            } else {
+                mHideSelectHandles = false;
+                showTextSelectionWindow();
+                postInvalidate();
             }
 
             return super.onSingleTapUp(e);
         }
 
         @Override
-        public boolean onFling(MotionEvent e1, MotionEvent e2, float velocityX, float velocityY) {
-            // TODO: Implement this method
-            if (Math.abs(velocityY) > Math.abs(velocityX))
-                velocityX = 0;
+        public boolean onFling(@NonNull MotionEvent e1, @NonNull MotionEvent e2, float velocityX, float velocityY) {
+            float vX = velocityX;
+            float vY = velocityY;
+            if (Math.abs(vY) > Math.abs(vX))
+                vX = 0;
             else
-                velocityY = 0;
+                vY = 0;
 
-            mScroller.fling(getScrollX(), getScrollY(), (int) -velocityX, (int) -velocityY,
+            mScroller.fling(getScrollX(), getScrollY(), (int) -vX, (int) -vY,
                     0, getMaxScrollX(), 0, getMaxScrollY());
 
             postInvalidate();
@@ -2607,124 +5722,103 @@ public class EditView extends View {
         }
 
         @Override
-        public void onLongPress(MotionEvent e) {
+        public void onLongPress(@NonNull MotionEvent e) {
             super.onLongPress(e);
             float x = e.getX() + getScrollX();
             float y = e.getY() + getScrollY();
 
+            mHideSelectHandles = false;
             removeCallbacks(blinkAction);
-            showTextSelectionWindow();
-            mCursorVisiable = mHandleMiddleVisable = true;
 
-            // Handle line number long press
+            // For all text selected, show menu at press coordinate
+            if (isAllTextSelected() || (isSelectMode && checkSelectRange(x, y))) {
+                int viewX = (int) e.getX();
+                int viewY = (int) e.getY();
+                showTextSelectionWindow(new Rect(viewX, viewY, viewX, viewY));
+            } else {
+                showTextSelectionWindow();
+            }
+
+            mCursorVisible = mHandleMiddleVisible = true;
+
             if (isInLineNumberArea(x, y)) {
                 int currentLine = getLineFromY(y);
                 handleLineNumberLongPress(currentLine);
                 return;
             }
 
-            if (!touchOnSelectHandleMiddle && mGapBuffer.length() > 0) {
+            if (!touchOnSelectHandleMiddle && !touchOnSelectHandleLeft && !touchOnSelectHandleRight && mGapBuffer.length() > 0) {
 
                 setCursorPosition(x, y);
-
-                String selectWord = findNearestWord();
-                if (selectWord != null) {
-                    removeCallbacks(blinkAction);
-                    mCursorVisiable = mHandleMiddleVisable = false;
-                    isSelectMode = true;
-
-                    int left = getLeftSpace();
-                    int lineStart = getLineStart(mCursorLine);
-                    selectHandleLeftX = left + measureText(mGapBuffer.substring(lineStart, selectionStart));
-                    selectHandleRightX = left + measureText(mGapBuffer.substring(lineStart, selectionEnd));
-                    selectHandleLeftY = selectHandleRightY = mCursorPosY + getLineHeight();
-
-                    setCursorPosition(selectionEnd);
-
-                    if (mMagnifierEnabled) {
-                        mIsMagnifierActive = true;
-                        showMagnifier(selectHandleRightX, selectHandleRightY);
-                    }
-                }
+                selectNearestWord();
             }
             postInvalidate();
         }
 
         @Override
-        public boolean onDoubleTap(MotionEvent e) {
+        public boolean onDoubleTap(@NonNull MotionEvent e) {
             super.onDoubleTap(e);
 
             float x = e.getX() + getScrollX();
             float y = e.getY() + getScrollY();
 
+            mHideSelectHandles = false;
             removeCallbacks(blinkAction);
-            mCursorVisiable = mHandleMiddleVisable = true;
-            showTextSelectionWindow();
+            mCursorVisible = mHandleMiddleVisible = true;
 
-            if (!touchOnSelectHandleMiddle && mGapBuffer.length() > 0) {
+            int viewX = (int) e.getX();
+            int viewY = (int) e.getY();
+            showTextSelectionWindow(new Rect(viewX, viewY, viewX, viewY));
+
+            if (!touchOnSelectHandleMiddle && !touchOnSelectHandleLeft && !touchOnSelectHandleRight && mGapBuffer.length() > 0) {
                 setCursorPosition(x, y);
-
-                String selectWord = findNearestWord();
-                if (selectWord != null) {
-                    removeCallbacks(blinkAction);
-                    mCursorVisiable = mHandleMiddleVisable = false;
-                    isSelectMode = true;
-
-                    int left = getLeftSpace();
-                    int lineStart = getLineStart(mCursorLine);
-                    selectHandleLeftX = left + measureText(mGapBuffer.substring(lineStart, selectionStart));
-                    selectHandleRightX = left + measureText(mGapBuffer.substring(lineStart, selectionEnd));
-                    selectHandleLeftY = selectHandleRightY = mCursorPosY + getLineHeight();
-
-                    setCursorPosition(selectionEnd);
-
-                    // Show what was selected (for debugging)
-                    Log.d(TAG, "Double tap selected: '" + selectWord + "'");
-                }
+                selectNearestWord();
             }
             postInvalidate();
             return super.onDoubleTap(e);
         }
 
-        // Expose onUp for outside calls
-        public void onUp(MotionEvent e) {
+        public void onUp(MotionEvent ignoredE) {
+            mAutoScrollFactor = 0f;
             if (mIsMagnifierActive) {
                 dismissMagnifier();
                 mIsMagnifierActive = false;
             }
-
             if (touchOnSelectHandleLeft || touchOnSelectHandleRight || touchOnSelectHandleMiddle) {
+                Rect targetRect = null;
+                if (touchOnSelectHandleLeft) {
+                    targetRect = getBoundingBox(getSelectionStart());
+                } else if (touchOnSelectHandleRight) {
+                    targetRect = getBoundingBox(getSelectionEnd());
+                } else {
+                    targetRect = getBoundingBox(mCursorIndex);
+                }
+
                 removeCallbacks(moveAction);
                 touchOnSelectHandleMiddle = false;
                 touchOnSelectHandleLeft = false;
                 touchOnSelectHandleRight = false;
 
                 if (isSelectMode) {
-                    setCursorPosition(selectionEnd);
-                    // Show immediately and schedule auto-hide
-                    showTextSelectionWindow();
-                    scheduleAutoHide();
+                    setCursorPosition(getSelectionEnd());
                 } else {
                     mLastTapTime = System.currentTimeMillis();
+                    removeCallbacks(blinkAction);
+                    mCursorVisible = true;
                     postDelayed(blinkAction, BLINK_TIMEOUT);
-                    // Hide after delay if not in selection mode
-                    scheduleAutoHide();
                 }
+
+                showTextSelectionWindow(targetRect); // Show menu at handle position
+                scheduleAutoHide();
             }
         }
 
         private void handleLineNumberLongPress(int currentLine) {
             if (!mWaitingForSecondSelection) {
-                // First long press - select single line and wait for second selection
                 selectSingleLine(currentLine);
                 mFirstSelectedLine = currentLine;
                 mWaitingForSecondSelection = true;
-
-                // Show visual hint that we're waiting for second selection
-                showSelectionHint();
-
             } else {
-                // Second long press - select range between first and current line
                 mSecondSelectedLine = currentLine;
                 selectLineRange(mFirstSelectedLine, mSecondSelectedLine);
                 mWaitingForSecondSelection = false;
@@ -2733,1134 +5827,64 @@ public class EditView extends View {
         }
     }
 
-    private void scheduleSelectionUpdate() {
-        mSelectionHandler.removeCallbacks(mUpdateSelectionPosition);
-        mSelectionHandler.postDelayed(mUpdateSelectionPosition, 100); // Small delay for smoothness
-    }
-
-    private void performHapticFeedback() {
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O_MR1) {
-            performHapticFeedback(HapticFeedbackConstants.TEXT_HANDLE_MOVE);
-        } else {
-            performHapticFeedback(HapticFeedbackConstants.LONG_PRESS);
-        }
-    }
-
-    private void selectLineRange(int startLine, int endLine) {
-        if (startLine < 1 || endLine < 1 || startLine > getLineCount() || endLine > getLineCount()) {
-            return;
-        }
-
-        removeCallbacks(blinkAction);
-        mCursorVisiable = false;
-        mHandleMiddleVisable = false;
-        isSelectMode = true;
-        mIsLineSelectionMode = true;
-
-        // Calculate the actual selection range
-        int actualStartLine = Math.min(startLine, endLine);
-        int actualEndLine = Math.max(startLine, endLine);
-
-        // Start from the beginning of first line
-        selectionStart = getLineStart(actualStartLine);
-
-        // End at the end of last line (including newline if present)
-        int endLineStart = getLineStart(actualEndLine);
-        String endLineText = getLine(actualEndLine);
-        selectionEnd = endLineStart + endLineText.length();
-
-        // Include newline character if it's not the last line
-        if (actualEndLine < getLineCount()) {
-            selectionEnd++;
-        }
-
-        mStartSelectionLine = actualStartLine;
-        mEndSelectionLine = actualEndLine;
-
-        updateSelectionHandles();
-        showTextSelectionWindow();
-        postInvalidate();
-
-        // Haptic feedback
-        performHapticFeedback();
-    }
-
-    private void showSelectionHint() {
-        // Flash the selected line or show some visual feedback
-        post(new Runnable() {
-            @Override
-            public void run() {
-                // You can change the background color or add animation
-                mHandleMiddleVisable = false;
-                postInvalidate();
-
-                // Reset after a short time
-                postDelayed(new Runnable() {
-                    @Override
-                    public void run() {
-                        if (mWaitingForSecondSelection) {
-                            mHandleMiddleVisable = false;
-                            postInvalidate();
-                        }
-                    }
-                }, 500);
-            }
-        });
-    }
-
-    private void selectSingleLine(int line) {
-        if (line < 1 || line > getLineCount()) return;
-
-        removeCallbacks(blinkAction);
-        mCursorVisiable = false;
-        mHandleMiddleVisable = false;
-        isSelectMode = true;
-        mIsLineSelectionMode = true;
-
-        // Calculate selection range for the entire line
-        int lineStart = getLineStart(line);
-        int lineEnd = lineStart + getLine(line).length();
-
-        // If it's the last line, include the newline character if present
-        if (line < getLineCount()) {
-            lineEnd++; // Include the newline character
-        }
-
-        selectionStart = lineStart;
-        selectionEnd = lineEnd;
-        mStartSelectionLine = line;
-        mEndSelectionLine = line;
-
-        updateSelectionHandles();
-        showTextSelectionWindow();
-        postInvalidate();
-    }
-
-    // clear long selection process
-    private void clearLineSelection() {
-        mWaitingForSecondSelection = false;
-        mFirstSelectedLine = -1;
-    }
-
-    // Helper method that used for selecting nearby word or special symbol
-    public void selectNearestWord() {
-        String selectWord = findNearestWord();
-        if (selectWord != null) {
-            removeCallbacks(blinkAction);
-            mCursorVisiable = false;
-            mHandleMiddleVisable = false;
-            isSelectMode = true;
-            mIsLineSelectionMode = true;
-
-            int left = getLeftSpace();
-            int lineStart = getLineStart(mCursorLine);
-            selectHandleLeftX = left + measureText(mGapBuffer.substring(lineStart, selectionStart));
-            selectHandleRightX = left + measureText(mGapBuffer.substring(lineStart, selectionEnd));
-            selectHandleLeftY = selectHandleRightY = mCursorPosY + getLineHeight();
-
-            setCursorPosition(selectHandleLeftX, selectHandleRightX);
-            setCursorPosition(selectionEnd);
-            showTextSelectionWindow();
-        }
-        postInvalidate();
-    }
-
-    // when on long press to select a word
-    public String findNearestWord() {
-        int length = mGapBuffer.length();
-        if (length == 0) return null;
-
-        if (mCursorIndex >= length) {
-            mCursorIndex = Math.max(0, length - 1);
-        }
-
-        if (isCurrentLineEmptyOrWhitespace()) {
-            return null;
-        }
-
-        // FIRST: Always try to find single special character
-        String selected = findSingleSpecialChar();
-        if (selected != null) return selected;
-
-        // SECOND: Then try word selection
-        selected = findWordAtCursor();
-        if (selected != null) return selected;
-
-        selected = findWordInVicinity();
-        if (selected != null) return selected;
-
-        selected = findAnyNonWhitespace();
-        return selected;
-    }
-
-    // Only select single special characters
-    private String findSingleSpecialChar() {
-        // Check current cursor position
-        if (mCursorIndex < mGapBuffer.length()) {
-            char currentChar = mGapBuffer.charAt(mCursorIndex);
-            if (isSpecialChar(currentChar)) {
-                selectionStart = mCursorIndex;
-                selectionEnd = mCursorIndex + 1;
-                return String.valueOf(currentChar);
-            }
-        }
-
-        // Check position before cursor
-        if (mCursorIndex > 0) {
-            char prevChar = mGapBuffer.charAt(mCursorIndex - 1);
-            if (isSpecialChar(prevChar)) {
-                selectionStart = mCursorIndex - 1;
-                selectionEnd = mCursorIndex;
-                return String.valueOf(prevChar);
-            }
-        }
-
-        return null;
-    }
-
-    // Special character detection
-    private boolean isSpecialChar(char c) {
-        // All special characters that should be selected individually
-        String specialChars = ":;\"\'`.,!?@#$%^&*()-+=[]{}<>/~|\\";
-        return specialChars.indexOf(c) >= 0;
-    }
-
-    // WORD selection only - stops at special characters
-    private String expandSelectionFrom(int position) {
-        int length = mGapBuffer.length();
-        if (position < 0 || position >= length) return null;
-
-        char startChar = mGapBuffer.charAt(position);
-
-        // If it's a special char, don't expand - let findSingleSpecialChar handle it
-        if (isSpecialChar(startChar)) {
-            return null;
-        }
-
-        // Expand left until whitespace OR special char
-        selectionStart = position;
-        while (selectionStart > 0) {
-            char c = mGapBuffer.charAt(selectionStart - 1);
-            if (Character.isWhitespace(c) || isSpecialChar(c)) break;
-            selectionStart--;
-        }
-
-        // Expand right until whitespace OR special char
-        selectionEnd = position;
-        while (selectionEnd < length) {
-            char c = mGapBuffer.charAt(selectionEnd);
-            if (Character.isWhitespace(c) || isSpecialChar(c)) break;
-            selectionEnd++;
-        }
-
-        if (selectionStart < selectionEnd) {
-            return mGapBuffer.substring(selectionStart, selectionEnd);
-        }
-
-        return null;
-    }
-
-    // Find word at cursor (EXCLUDING special chars)
-    private String findWordAtCursor() {
-        // First, check if cursor is directly on a WORD character (not special char)
-        if (mCursorIndex < mGapBuffer.length()) {
-            char currentChar = mGapBuffer.charAt(mCursorIndex);
-            if (!Character.isWhitespace(currentChar) && !isSpecialChar(currentChar)) {
-                return expandSelectionFrom(mCursorIndex);
-            }
-        }
-
-        // Check character before cursor (only if it's a WORD character)
-        if (mCursorIndex > 0) {
-            char prevChar = mGapBuffer.charAt(mCursorIndex - 1);
-            if (!Character.isWhitespace(prevChar) && !isSpecialChar(prevChar)) {
-                return expandSelectionFrom(mCursorIndex - 1);
-            }
-        }
-
-        return null;
-    }
-
-    // Find word in vicinity (EXCLUDING special chars)
-    private String findWordInVicinity() {
-        int length = mGapBuffer.length();
-        if (length == 0) return null;
-
-        for (int radius = 1; radius <= 20; radius++) {
-            // Check forward
-            int forwardPos = mCursorIndex + radius;
-            if (forwardPos < length) {
-                char c = mGapBuffer.charAt(forwardPos);
-                // If it's a special char, select it individually
-                if (isSpecialChar(c)) {
-                    selectionStart = forwardPos;
-                    selectionEnd = forwardPos + 1;
-                    return String.valueOf(c);
-                }
-                // If it's a word char (not special, not whitespace), expand word
-                if (!Character.isWhitespace(c) && !isSpecialChar(c)) {
-                    return expandSelectionFrom(forwardPos);
-                }
-            }
-
-            // Check backward
-            int backwardPos = mCursorIndex - radius;
-            if (backwardPos >= 0) {
-                char c = mGapBuffer.charAt(backwardPos);
-                // If it's a special char, select it individually
-                if (isSpecialChar(c)) {
-                    selectionStart = backwardPos;
-                    selectionEnd = backwardPos + 1;
-                    return String.valueOf(c);
-                }
-                // If it's a word char (not special, not whitespace), expand word
-                if (!Character.isWhitespace(c) && !isSpecialChar(c)) {
-                    return expandSelectionFrom(backwardPos);
-                }
-            }
-        }
-
-        return null;
-    }
-
-    // Find any non-whitespace (but still respect special chars)
-    private String findAnyNonWhitespace() {
-        // Check if current line is empty first
-        String currentLine = getLine(mCursorLine);
-        if (currentLine == null || currentLine.trim().isEmpty()) {
-            return null;
-        }
-
-        int lineStart = getLineStart(mCursorLine);
-        int lineEnd = lineStart + getLine(mCursorLine).length();
-
-        for (int i = lineStart; i < lineEnd; i++) {
-            if (i < mGapBuffer.length()) {
-                char c = mGapBuffer.charAt(i);
-                if (!Character.isWhitespace(c)) {
-                    // If it's a special char, select only that char
-                    if (isSpecialChar(c)) {
-                        selectionStart = i;
-                        selectionEnd = i + 1;
-                        return String.valueOf(c);
-                    }
-                    // Otherwise expand word (will stop at special chars)
-                    return expandSelectionFrom(i);
-                }
-            }
-        }
-
-        return null;
-    }
-
-    //  helper method to check line is empty or not
-    private boolean isCurrentLineEmptyOrWhitespace() {
-        String currentLine = getLine(mCursorLine);
-        if (currentLine == null || currentLine.isEmpty()) {
-            return true;
-        }
-
-        // Check if line contains only whitespace
-        for (int i = 0; i < currentLine.length(); i++) {
-            if (!Character.isWhitespace(currentLine.charAt(i))) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    // ===== Editor Custom Functionalities ===== //
-
-    // copy line texts
-    public void copyLine() {
-        if (isSelectMode) {
-            int[] sel = normalizeSelection();
-            int s = sel[0], e = sel[1];
-            int[] range = fullLineRangeForSelection(s, e);
-            if (range != null) {
-                copyRangeToClipboard(range[0], range[1], "lines");
-                return;
-            }
-            // degenerate -> fallthrough to no-selection behavior
-        }
-
-        // no selection path: copy current line and select it in UI
-        int[] range = fullLineRangeForCursorLine(mCursorLine);
-        copyRangeToClipboard(range[0], range[1], "line");
-        setSelection(range[0], range[1]);
-    }
-
-    // cut line texts
-    public void cutLine() {
-        if (isSelectMode) {
-            int[] sel = normalizeSelection();
-            int s = sel[0], e = sel[1];
-            int[] range = fullLineRangeForSelection(s, e);
-            if (range != null) {
-                // copy then delete as a batch (single undo)
-                copyRangeToClipboard(range[0], range[1], "lines");
-                batchDeleteWithSelectionSnapshot(range[0], range[1],
-                true, selectionStart, selectionEnd,
-                false, -1, -1);
-                clearSelection();
-                mCursorIndex = range[0];
-                mCursorLine = getOffsetLine(mCursorIndex);
-                adjustCursorPosition();
-                onTextChanged();
-                postInvalidate();
-                return;
-            }
-            // degenerate -> fallthrough to single-line cut
-        }
-
-        // no selection: cut current line
-        int[] range = fullLineRangeForCursorLine(mCursorLine);
-        copyRangeToClipboard(range[0], range[1], "line");
-        batchDeleteWithSelectionSnapshot(range[0], range[1],
-        false, selectionStart, selectionEnd,
-        false, -1, -1);
-        mCursorIndex = range[0];
-        mCursorLine = getOffsetLine(mCursorIndex);
-        adjustCursorPosition();
-        clearSelectionMenu();
-        onTextChanged();
-        postInvalidate();
-    }
-
-    // Replace line with clipboard text
-    public void replaceLine() {
-        if (!mClipboard.hasPrimaryClip()) return;
-        ClipData data = mClipboard.getPrimaryClip();
-        if (data == null || data.getItemCount() == 0) return;
-        ClipData.Item item = data.getItemAt(0);
-        CharSequence raw = item.getText();
-        if (raw == null) return;
-        String clipboardText = raw.toString();
-
-        if (isSelectMode) {
-            int[] sel = normalizeSelection();
-            int s = sel[0], e = sel[1];
-            int[] range = fullLineRangeForSelection(s, e);
-            if (range != null) {
-                int replaceStart = range[0];
-                int replaceEnd = range[1];
-                batchReplaceWithSelectionSnapshot(replaceStart, replaceEnd, clipboardText,
-                true, selectionStart, selectionEnd,
-                true, replaceStart, replaceStart + clipboardText.length());
-                // update UI to reflect selection of replaced block
-                setSelection(replaceStart, replaceStart + clipboardText.length());
-                clearSelectionMenu(); // optional; original logic kept
-                mCursorIndex = selectionEnd;
-                mCursorLine = getOffsetLine(mCursorIndex);
-                adjustCursorPosition();
-                onTextChanged();
-                postInvalidate();
-                return;
-            }
-            // degenerate -> fallthrough
-        }
-
-        // no selection: replace current line content
-        int[] range = fullLineRangeForCursorLine(mCursorLine);
-        int lineStart = range[0];
-        int lineEnd = range[1];
-        batchReplaceWithSelectionSnapshot(lineStart, lineEnd, clipboardText,
-        false, selectionStart, selectionEnd,
-        false, -1, -1);
-        clearSelection();
-        mCursorIndex = lineStart + clipboardText.length();
-        mCursorLine = getOffsetLine(mCursorIndex);
-        adjustCursorPosition();
-        onTextChanged();
-        postInvalidate();
-    }
-
-    // clear line texts
-    public void deleteLine() {
-        if (isSelectMode) {
-            int[] sel = normalizeSelection();
-            int s = sel[0], e = sel[1];
-            int[] range = fullLineRangeForSelection(s, e);
-            if (range != null) {
-                batchDeleteWithSelectionSnapshot(range[0], range[1],
-                true, selectionStart, selectionEnd,
-                false, -1, -1);
-                clearSelection();
-                mCursorIndex = Math.min(range[0], mGapBuffer.length());
-                mCursorLine = getOffsetLine(mCursorIndex);
-                adjustCursorPosition();
-                onTextChanged();
-                postInvalidate();
-                return;
-            }
-            // degenerate -> fallthrough
-        }
-
-        // no selection: delete current line
-        int[] range = fullLineRangeForCursorLine(mCursorLine);
-        batchDeleteWithSelectionSnapshot(range[0], range[1],
-        false, selectionStart, selectionEnd,
-        false, -1, -1);
-        mCursorIndex = Math.min(range[0], mGapBuffer.length());
-        mCursorLine = getOffsetLine(mCursorIndex);
-        adjustCursorPosition();
-        clearSelectionMenu();
-        onTextChanged();
-        postInvalidate();
-    }
-
-    // Clear line texts but keep line number
-    public void emptyLine() {
-        if (isSelectMode) {
-            int[] sel = normalizeSelection();
-            int s = sel[0], e = sel[1];
-            int[] range = fullLineRangeForSelection(s, e);
-            if (range != null) {
-                // delete each line's content but keep newlines (we delete content range per-line)
-                mGapBuffer.markSelectionBefore(selectionStart, selectionEnd, true);
-                mGapBuffer.beginBatchEdit();
-                int firstLine = getOffsetLine(s);
-                int lastLine = getOffsetLine(Math.max(0, e - 1));
-                for (int line = firstLine; line <= lastLine; line++) {
-                    int start = getLineStart(line);
-                    int end = start + getLine(line).length();
-                    if (end > start) {
-                        mGapBuffer.delete(start, end, true);
-                    }
-                }
-                mGapBuffer.markSelectionAfter(-1, -1, false);
-                mGapBuffer.endBatchEdit();
-
-                clearSelection();
-                mCursorLine = getOffsetLine(range[0]);
-                mCursorIndex = getLineStart(mCursorLine);
-                adjustCursorPosition();
-                onTextChanged();
-                postInvalidate();
-                return;
-            }
-            // degenerate -> fallthrough
-        }
-
-        // no selection: empty current line
-        int[] range = fullLineRangeForCursorLine(mCursorLine);
-        int lineStart = range[0];
-        int lineEnd = range[1];
-        if (lineEnd > lineStart) {
-            mGapBuffer.beginBatchEdit();
-            mGapBuffer.delete(lineStart, lineEnd, true);
-            mGapBuffer.endBatchEdit();
-        }
-        mCursorIndex = lineStart;
-        adjustCursorPosition();
-        clearSelectionMenu();
-        onTextChanged();
-        postInvalidate();
-    }
-
-    public void duplicateLine() {
-        // --- CASE 1: Selection Mode ---
-        if (isSelectMode) {
-
-            int start = Math.min(selectionStart, selectionEnd);
-            int end = Math.max(selectionStart, selectionEnd);
-
-            // Expand selection to full lines
-            int startLine = getOffsetLine(start);
-            int endLine = getOffsetLine(end);
-
-            int lineStart = getLineStart(startLine);
-            int lineEnd = getLineEnd(endLine);
-
-            String block = mGapBuffer.substring(lineStart, lineEnd);
-
-            // Insert duplicated block (ALWAYS add newline before block)
-            mGapBuffer.insert(lineEnd, "\n" + block, true);
-
-            // Reselect duplicated block
-            int dupStart = lineEnd + 1;
-            int dupEnd = dupStart + block.length();
-
-            selectionStart = dupStart;
-            selectionEnd = dupEnd;
-
-            updateSelectionHandles();
-            onTextChanged();
-            postInvalidate();
-            return;
-        }
-
-        // --- CASE 2: No Selection (Cursor only) ---
-        int currentLine = mCursorLine;
-
-        int lineStart = getLineStart(currentLine);
-        int lineEnd = getLineEnd(currentLine);
-
-        String lineText = mGapBuffer.substring(lineStart, lineEnd);
-
-        // Insert duplicated line
-        mGapBuffer.insert(lineEnd, "\n" + lineText, true);
-
-        // Maintain cursor column
-        int col = getColumn();
-
-        // Move cursor to new duplicated line
-        int newLine = currentLine + 1;
-        int newLineStart = getLineStart(newLine);
-
-        int target = newLineStart + col;
-
-        // Clamp column if line shorter
-        int newLineEnd = getLineEnd(newLine);
-        if (target > newLineEnd) {
-            target = newLineEnd;
-        }
-
-        // APPLY cursor move
-        setCursorPosition(target);
-
-        // Ensure no selection mode active
-        isSelectMode = false;
-        clearLineSelection();
-
-        onTextChanged();
-        postInvalidate();
-    }
-
-    // Case conversion methods
-    public void convertSelectionToLowerCase() {
-        if (isSelectMode) {
-            // normalize & clamp selection (defensive)
-            int s = Math.max(0, Math.min(selectionStart, selectionEnd));
-            int e = Math.max(0, Math.max(selectionStart, selectionEnd));
-            if (s == e) return;
-
-            String selectedText = mGapBuffer.substring(s, e);
-            if (selectedText != null && !selectedText.isEmpty()) {
-                String lowerCaseText = selectedText.toLowerCase();
-
-                mGapBuffer.beginBatchEdit(); // <<< group undo
-                mGapBuffer.replace(s, e, lowerCaseText, true);
-                mGapBuffer.endBatchEdit(); // <<< end group
-
-                // update selection to cover replaced text (handles length changes)
-                selectionStart = s;
-                selectionEnd = s + lowerCaseText.length();
-
-                // clamp
-                selectionStart = Math.max(0, Math.min(selectionStart, mGapBuffer.length()));
-                selectionEnd = Math.max(0, Math.min(selectionEnd, mGapBuffer.length()));
-
-                updateSelectionHandles();
-            }
-        } else {
-            // no selection: operate on current line
-            int lineStart = getLineStart(mCursorLine);
-            String currentLine = getLine(mCursorLine);
-            if (currentLine != null && !currentLine.isEmpty()) {
-                String lowerCaseText = currentLine.toLowerCase();
-
-                mGapBuffer.beginBatchEdit();
-                mGapBuffer.replace(lineStart, lineStart + currentLine.length(), lowerCaseText, true);
-                mGapBuffer.endBatchEdit();
-
-                clearSelectionMenu();
-
-                // move cursor to end of the replaced line
-                mCursorIndex = lineStart + lowerCaseText.length();
-                mCursorLine = getOffsetLine(mCursorIndex);
-                adjustCursorPosition();
-            }
-        }
-        onTextChanged();
-        postInvalidate();
-    }
-
-    public void convertSelectionToUpperCase() {
-        if (isSelectMode) {
-            // normalize & clamp selection (defensive)
-            int s = Math.max(0, Math.min(selectionStart, selectionEnd));
-            int e = Math.max(0, Math.max(selectionStart, selectionEnd));
-            if (s == e) return;
-
-            String selectedText = mGapBuffer.substring(s, e);
-            if (selectedText != null && !selectedText.isEmpty()) {
-                String upperCaseText = selectedText.toUpperCase();
-
-                mGapBuffer.beginBatchEdit(); // <<< group undo
-                mGapBuffer.replace(s, e, upperCaseText, true);
-                mGapBuffer.endBatchEdit(); // <<< end group
-
-                // update selection to cover replaced text (handles length changes)
-                selectionStart = s;
-                selectionEnd = s + upperCaseText.length();
-
-                // clamp
-                selectionStart = Math.max(0, Math.min(selectionStart, mGapBuffer.length()));
-                selectionEnd = Math.max(0, Math.min(selectionEnd, mGapBuffer.length()));
-
-                updateSelectionHandles();
-            }
-        } else {
-            // no selection: operate on current line
-            int lineStart = getLineStart(mCursorLine);
-            String currentLine = getLine(mCursorLine);
-            if (currentLine != null && !currentLine.isEmpty()) {
-                String upperCaseText = currentLine.toUpperCase();
-
-                mGapBuffer.beginBatchEdit();
-                mGapBuffer.replace(lineStart, lineStart + currentLine.length(), upperCaseText, true);
-                mGapBuffer.endBatchEdit();
-
-                clearSelectionMenu();
-
-                // move cursor to end of the replaced line
-                mCursorIndex = lineStart + upperCaseText.length();
-                mCursorLine = getOffsetLine(mCursorIndex);
-                adjustCursorPosition();
-            }
-        }
-        onTextChanged();
-        postInvalidate();
-    }
-
-// Indentation methods
-    public void increaseIndent() {
-        mGapBuffer.beginBatchEdit(); // UNDO batch start
-
-        if (isSelectMode) {
-            int startLine = getOffsetLine(selectionStart);
-            int endLine = getOffsetLine(selectionEnd);
-
-            for (int i = startLine; i <= endLine; i++) {
-                int lineStart = getLineStart(i);
-                mGapBuffer.insert(lineStart, "    ", true); // record in undo
-            }
-
-            int indentSize = 4;
-            selectionStart += indentSize;
-            selectionEnd += (endLine - startLine + 1) * indentSize;
-            updateSelectionHandles();
-        } else {
-            int lineStart = getLineStart(mCursorLine);
-            mGapBuffer.insert(lineStart, "    ", true);
-
-            mCursorIndex += 4;
-            adjustCursorPosition();
-            clearSelectionMenu();
-        }
-
-        mGapBuffer.endBatchEdit(); // UNDO batch end
-
-        // Restore selection state after undo/redo cycles
-        if (isSelectMode) {
-            selectionStart = Math.min(mGapBuffer.length(), selectionStart);
-            selectionEnd = Math.min(mGapBuffer.length(), selectionEnd);
-            updateSelectionHandles();
-        } else {
-            isSelectMode = false;
-        }
-
-        onTextChanged();
-        postInvalidate();
-    }
-
-    // Decrease indent
-    public void decreaseIndent() {
-        if (!isSelectMode) {
-            // single-line path
-            mGapBuffer.beginBatchEdit();
-
-            int lineStart = getLineStart(mCursorLine);
-            String line = getLine(mCursorLine);
-
-            int spacesToRemove = 0;
-            if (line.startsWith("    ")) spacesToRemove = 4;
-            else if (line.startsWith("  ")) spacesToRemove = 2;
-            else if (line.startsWith("\t")) spacesToRemove = 1;
-            else if (line.startsWith(" ")) spacesToRemove = 1;
-
-            if (spacesToRemove > 0) {
-                mGapBuffer.delete(lineStart, lineStart + spacesToRemove, true);
-                mCursorIndex = Math.max(0, mCursorIndex - spacesToRemove);
-                adjustCursorPosition();
-            }
-
-            mGapBuffer.endBatchEdit();
-            onTextChanged();
-            postInvalidate();
-            return;
-        }
-
-        // --- Multi-line selection
-        int selStartOrig = Math.max(0, Math.min(selectionStart, selectionEnd));
-        int selEndOrig = Math.max(0, Math.max(selectionStart, selectionEnd));
-
-        int startLine = getOffsetLine(selStartOrig);
-        int endLine = getOffsetLine(selEndOrig == 0 ? 0 : Math.max(0, selEndOrig - 1));
-        // build snapshot of line starts and text BEFORE any edits
-        int lineCount = endLine - startLine + 1;
-        int[] lineStarts = new int[lineCount];
-        String[] lineTexts = new String[lineCount];
-
-        for (int i = 0; i < lineCount; i++) {
-            int lineNo = startLine + i;
-            lineStarts[i] = getLineStart(lineNo);
-            lineTexts[i] = getLine(lineNo);
-        }
-
-        mGapBuffer.beginBatchEdit();
-
-        int totalRemoved = 0; // cumulative removed so far (affects later delete positions)
-
-        for (int i = 0; i < lineCount; i++) {
-            int origLineStart = lineStarts[i];
-            String line = lineTexts[i];
-
-            int spacesToRemove = 0;
-            if (line.startsWith("    ")) spacesToRemove = 4;
-            else if (line.startsWith("  ")) spacesToRemove = 2;
-            else if (line.startsWith("\t")) spacesToRemove = 1;
-            else if (line.startsWith(" ")) spacesToRemove = 1;
-            else continue; // nothing to remove on this line
-
-            // delete position must be adjusted by how many chars we removed earlier
-            int deleteStart = origLineStart - totalRemoved;
-            // defensive clamp
-            deleteStart = Math.max(0, Math.min(deleteStart, mGapBuffer.length()));
-
-            mGapBuffer.delete(deleteStart, deleteStart + spacesToRemove, true);
-
-            // update cumulative removed
-            totalRemoved += spacesToRemove;
-
-            // adjust original selection endpoints relative to original line starts:
-            // if the deleted area was strictly before the original selection start/end, shift them
-            // left
-            if (origLineStart < selStartOrig)
-                selStartOrig = Math.max(0, selStartOrig - spacesToRemove);
-            if (origLineStart < selEndOrig) selEndOrig = Math.max(0, selEndOrig - spacesToRemove);
-        }
-
-        mGapBuffer.endBatchEdit();
-
-        // Apply adjusted selection values and clamp to buffer
-        selectionStart = Math.max(0, Math.min(selStartOrig, mGapBuffer.length()));
-        selectionEnd = Math.max(0, Math.min(selEndOrig, mGapBuffer.length()));
-        updateSelectionHandles();
-
-        onTextChanged();
-        postInvalidate();
-    }
-
-    // Add Comment
-    public void toggleComment() {
-        // Determine the affected lines depending on selection mode
-        int startLine, endLine;
-
-        if (isSelectMode) {
-            // ensure selection indices are normalized and clamped
-            int s = Math.max(0, Math.min(selectionStart, selectionEnd));
-            int e = Math.max(0, Math.max(selectionStart, selectionEnd));
-            startLine = getOffsetLine(s);
-            endLine = getOffsetLine(e == 0 ? 0 : Math.max(0, e - 1)); // ensure we pick the line
-            // that contains e-1
-        } else {
-            // single line: operate only on cursor line
-            startLine = endLine = mCursorLine;
-        }
-
-        mGapBuffer.beginBatchEdit(); // group all changes into one undo step
-
-        boolean allCommented = true;
-        for (int i = startLine; i <= endLine; i++) {
-            String line = getLine(i);
-            if (!isLineCommented(line) && !line.trim().isEmpty()) {
-                allCommented = false;
-                break;
-            }
-        }
-
-        // If all lines are commented -> remove, else add comments for uncommented lines
-        for (int i = startLine; i <= endLine; i++) {
-            String line = getLine(i);
-            if (allCommented) {
-                // only remove if commented
-                if (isLineCommented(line)) {
-                    removeCommentFromLine(i);
-                }
-            } else {
-                // add comment if not commented and not blank
-                if (!isLineCommented(line) && !line.trim().isEmpty()) {
-                    addCommentToLine(i);
-                }
-            }
-        }
-
-        mGapBuffer.endBatchEdit(); // end grouping
-
-        // After editing, update UI and selection/cursor
-        if (isSelectMode) {
-            // Keep selection mode, but selection offsets were adjusted in add/remove helpers.
-            updateSelectionHandles();
-        } else {
-            clearSelectionMenu();
-            adjustCursorPosition();
-        }
-
-        onTextChanged();
-        postInvalidate();
-    }
-
-    private boolean isLineCommented(String line) {
-        if (line == null || line.isEmpty()) return false;
-
-        // Find the position after leading whitespace
-        int contentStart = 0;
-        while (contentStart < line.length() && Character.isWhitespace(line.charAt(contentStart))) {
-            contentStart++;
-        }
-
-        // Check if there's a comment after whitespace
-        return contentStart < line.length() && line.charAt(contentStart) == '#';
-    }
-
-    public void addComment() {
-        if (isSelectMode) {
-            int s = Math.max(0, Math.min(selectionStart, selectionEnd));
-            int e = Math.max(0, Math.max(selectionStart, selectionEnd));
-            int startLine = getOffsetLine(s);
-            int endLine = getOffsetLine(e == 0 ? 0 : Math.max(0, e - 1));
-
-            mGapBuffer.beginBatchEdit();
-            for (int i = startLine; i <= endLine; i++) {
-                String line = getLine(i);
-                if (!isLineCommented(line) && !line.trim().isEmpty()) {
-                    addCommentToLine(i);
-                }
-            }
-            mGapBuffer.endBatchEdit();
-
-            updateSelectionHandles();
-        } else {
-            String line = getLine(mCursorLine);
-            if (!isLineCommented(line) && !line.trim().isEmpty()) {
-                mGapBuffer.beginBatchEdit();
-                addCommentToLine(mCursorLine);
-                mGapBuffer.endBatchEdit();
-            }
-            clearSelectionMenu();
-            adjustCursorPosition();
-        }
-        onTextChanged();
-        postInvalidate();
-    }
-
-    public void removeComment() {
-        if (isSelectMode) {
-            int s = Math.max(0, Math.min(selectionStart, selectionEnd));
-            int e = Math.max(0, Math.max(selectionStart, selectionEnd));
-            int startLine = getOffsetLine(s);
-            int endLine = getOffsetLine(e == 0 ? 0 : Math.max(0, e - 1));
-
-            mGapBuffer.beginBatchEdit();
-            for (int i = startLine; i <= endLine; i++) {
-                String line = getLine(i);
-                if (isLineCommented(line)) {
-                    removeCommentFromLine(i);
-                }
-            }
-            mGapBuffer.endBatchEdit();
-
-            updateSelectionHandles();
-        } else {
-            String line = getLine(mCursorLine);
-            if (isLineCommented(line)) {
-                mGapBuffer.beginBatchEdit();
-                removeCommentFromLine(mCursorLine);
-                mGapBuffer.endBatchEdit();
-            }
-            clearSelectionMenu();
-            adjustCursorPosition();
-        }
-        onTextChanged();
-        postInvalidate();
-    }
-
-    private void addCommentToLine(int lineNumber) {
-        int lineStart = getLineStart(lineNumber);
-        String line = getLine(lineNumber);
-
-        if (line == null || line.trim().isEmpty() || isLineCommented(line)) return;
-
-        int contentStart = 0;
-        while (contentStart < line.length() && Character.isWhitespace(line.charAt(contentStart))) {
-            contentStart++;
-        }
-
-        int insertPos = lineStart + contentStart; // logical offset where comment marker should be
-        // inserted
-
-        // Insert marker and capture undo
-        mGapBuffer.insert(insertPos, getCommentBlock() + " ", true);
-
-        // If selection exists, shift selection indices forward when they are at/after insert
-        if (isSelectMode) {
-            // Use >= so selection that starts exactly at insert will include the inserted text
-            if (selectionStart >= insertPos) selectionStart += 2;
-            if (selectionEnd >= insertPos) selectionEnd += 2;
-            // clamp
-            selectionStart = Math.max(0, Math.min(selectionStart, mGapBuffer.length()));
-            selectionEnd = Math.max(0, Math.min(selectionEnd, mGapBuffer.length()));
-        } else {
-            // If single-line and cursor is on the same line, advance cursor offset so cursor stays
-            // after inserted marker
-            int cursorOffset = getLineStart(lineNumber) + contentStart;
-            // if you keep cursor as an offset, update it here; otherwise adjust mCursorLine related
-            // state via adjustCursorPosition()
-            // (call adjustCursorPosition() at the caller after editing)
-        }
-    }
-
-    private void removeCommentFromLine(int lineNumber) {
-        int lineStart = getLineStart(lineNumber);
-        String line = getLine(lineNumber);
-
-        if (line == null || line.isEmpty()) return;
-
-        int contentStart = 0;
-        while (contentStart < line.length() &&
-                Character.isWhitespace(line.charAt(contentStart))) {
-            contentStart++;
-        }
-
-        String block = getCommentBlock();
-        int blockLen = block.length();
-
-        // check if line starts with comment block
-        if (contentStart + blockLen <= line.length() &&
-                line.startsWith(block, contentStart)) {
-
-            int deleteStart = lineStart + contentStart;
-            int deleteEnd = deleteStart + blockLen;
-
-            // If there is a space after the comment, delete that too
-            int nextCharIndex = contentStart + blockLen;
-            if (nextCharIndex < line.length() && line.charAt(nextCharIndex) == ' ') {
-                deleteEnd++; // remove the extra space
-            }
-
-            mGapBuffer.delete(deleteStart, deleteEnd, true);
-
-            // update selection
-            int removedCount = deleteEnd - deleteStart;
-
-            if (isSelectMode) {
-                if (selectionStart > deleteStart) selectionStart -= removedCount;
-                if (selectionEnd > deleteStart) selectionEnd -= removedCount;
-
-                selectionStart = Math.max(0, Math.min(selectionStart, mGapBuffer.length()));
-                selectionEnd = Math.max(0, Math.min(selectionEnd, mGapBuffer.length()));
-            }
-        }
-    }
-
-    // Normalize and clamp selection; returns [start, end] with start<=end
-    private int[] normalizeSelection() {
-        int s = Math.max(0, Math.min(selectionStart, selectionEnd));
-        int e = Math.max(0, Math.max(selectionStart, selectionEnd));
-        s = Math.max(0, Math.min(s, mGapBuffer.length()));
-        e = Math.max(0, Math.min(e, mGapBuffer.length()));
-        return new int[]{s, e};
-    }
-
-    // Compute full-line range [startOffset, endOffset] that covers selection [s,e].
-    // If e==s this returns null (degenerate).
-    // endOffset is content-end (not including trailing newline) for last line.
-    private int[] fullLineRangeForSelection(int s, int e) {
-        if (s >= e) return null;
-        int firstLine = getOffsetLine(s);
-        int lastLine = getOffsetLine(Math.max(0, e - 1));
-        int start = getLineStart(firstLine);
-        int lastLineStart = getLineStart(lastLine);
-        int end = lastLineStart + getLine(lastLine).length(); // content-end
-        start = Math.max(0, Math.min(start, mGapBuffer.length()));
-        end = Math.max(0, Math.min(end, mGapBuffer.length()));
-        if (start > end) end = start;
-        return new int[]{start, end};
-    }
-
-// Compute full-line range for the current cursor line (no newline included).
-    private int[] fullLineRangeForCursorLine(int line) {
-        int start = getLineStart(line);
-        int end = start + getLine(line).length();
-        start = Math.max(0, Math.min(start, mGapBuffer.length()));
-        end = Math.max(0, Math.min(end, mGapBuffer.length()));
-        if (start > end) end = start;
-        return new int[]{start, end};
-    }
-
-// Helper: mark selection before, begin batch, run replace once, mark after, end batch.
-// keepSelectAfter indicates whether to set selection to [outStart, outEnd] after replace
-    private void batchReplaceWithSelectionSnapshot(int replaceStart, int replaceEnd, String text,
-            boolean wasSelectBefore, int selBeforeStart, int selBeforeEnd,
-            boolean setSelectionAfter, int selAfterStart, int selAfterEnd) {
-        mGapBuffer.markSelectionBefore(selBeforeStart, selBeforeEnd, wasSelectBefore);
-        mGapBuffer.beginBatchEdit();
-        mGapBuffer.replace(replaceStart, replaceEnd, text, true);
-        if (setSelectionAfter) {
-            mGapBuffer.markSelectionAfter(selAfterStart, selAfterEnd, true);
-        } else {
-            mGapBuffer.markSelectionAfter(-1, -1, false);
-        }
-        mGapBuffer.endBatchEdit();
-    }
-
-    // Helper: delete a range with selection snapshot grouping
-    private void batchDeleteWithSelectionSnapshot(int delStart, int delEnd,
-            boolean wasSelectBefore, int selBeforeStart, int selBeforeEnd,
-            boolean setSelectionAfter, int selAfterStart, int selAfterEnd) {
-        mGapBuffer.markSelectionBefore(selBeforeStart, selBeforeEnd, wasSelectBefore);
-        mGapBuffer.beginBatchEdit();
-        mGapBuffer.delete(delStart, delEnd, true);
-        if (setSelectionAfter) {
-            mGapBuffer.markSelectionAfter(selAfterStart, selAfterEnd, true);
-        } else {
-            mGapBuffer.markSelectionAfter(-1, -1, false);
-        }
-        mGapBuffer.endBatchEdit();
-    }
-
-    // Helper: copy a buffer-range to clipboard
-    private void copyRangeToClipboard(int start, int end, String label) {
-        start = Math.max(0, Math.min(start, mGapBuffer.length()));
-        end = Math.max(0, Math.min(end, mGapBuffer.length()));
-        if (start > end) end = start;
-        String text = mGapBuffer.substring(start, end);
-        if (text != null && !text.isEmpty()) {
-            ClipData data = ClipData.newPlainText(label, text);
-            mClipboard.setPrimaryClip(data);
-        }
-    }
-
-    // Helper: clear selection UI (common)
-    private void clearSelection() {
-        clearSelectionMenu();
-        isSelectMode = false;
-        selectionStart = selectionEnd = -1;
-    }
-
-    // ===== SCALE GESTURE LISTENER CLASS =====
     class ScaleGestureListener extends ScaleGestureDetector.SimpleOnScaleGestureListener {
         @Override
-        public boolean onScale(ScaleGestureDetector detector) {
-            float factor = detector.getScaleFactor();
-            setTextSize(mTextPaint.getTextSize() * factor);
+        public boolean onScaleBegin(ScaleGestureDetector detector) {
+            mIsScaling = true;
+            mZoomScale = 1.0f;
+            mZoomFocusX = detector.getFocusX();
+            mZoomFocusY = detector.getFocusY();
             return true;
+        }
+
+        @Override
+        public boolean onScale(ScaleGestureDetector detector) {
+            float scaleFactor = detector.getScaleFactor();
+            float newZoomScale = mZoomScale * scaleFactor;
+
+            // Prevent over-zoom by clamping the projected text size during the gesture
+            float currentSize = mTextPaint.getTextSize();
+            float minPx = ScreenUtils.dip2px(getContext(), 10);
+            float maxPx = ScreenUtils.dip2px(getContext(), 30);
+            float projectedSize = currentSize * newZoomScale;
+
+            if (projectedSize < minPx) {
+                newZoomScale = minPx / currentSize;
+            } else if (projectedSize > maxPx) {
+                newZoomScale = maxPx / currentSize;
+            }
+
+            mZoomScale = newZoomScale;
+            mZoomFocusX = detector.getFocusX();
+            mZoomFocusY = detector.getFocusY();
+            invalidate();
+            return true;
+        }
+
+        @Override
+        public void onScaleEnd(@NonNull ScaleGestureDetector detector) {
+            float finalSize = mTextPaint.getTextSize() * mZoomScale;
+            mIsScaling = false;
+            mZoomScale = 1.0f;
+
+            setTextSize(finalSize, mZoomFocusX, mZoomFocusY, true);
+
+            if (mWordWrap) {
+                if (mHighlighter != null) {
+                    mHighlighter.setWordWrap(true, getWrapWidth());
+                }
+                computeLineTops();
+            } else {
+                calculateMaxWidth();
+            }
+            adjustCursorPosition();
+            if (isSelectMode) {
+                updateSelectionHandles();
+            }
+            postInvalidate();
         }
     }
 
-    // ---------- Text input connection (IME) ----------
     class TextInputConnection extends BaseInputConnection {
 
         public TextInputConnection(View view, boolean fullEditor) {
@@ -3868,28 +5892,72 @@ public class EditView extends View {
         }
 
         @Override
-        public boolean commitText(CharSequence text, int newCursorPosition) {
-            long currentTime = System.currentTimeMillis();
+        public Editable getEditable() {
+            return getText();
+        }
 
-            if (currentTime - mLastInputTime < INPUT_DEBOUNCE_DELAY &&
-                    text.toString().equals(mLastCommittedText)) {
-                return true;
+        @Override
+        public CharSequence getTextBeforeCursor(int n, int flags) {
+            int len = mGapBuffer.length();
+            int start = Math.max(0, mCursorIndex - n);
+            int end = Math.min(len, mCursorIndex);
+            if (start > end) return "";
+            return mGapBuffer.substring(start, end);
+        }
+
+        @Override
+        public CharSequence getTextAfterCursor(int n, int flags) {
+            int len = mGapBuffer.length();
+            int start = Math.min(len, mCursorIndex);
+            int end = Math.min(len, mCursorIndex + n);
+            if (start > end) return "";
+            return mGapBuffer.substring(start, end);
+        }
+
+        @Override
+        public CharSequence getSelectedText(int flags) {
+            if (isSelectMode) {
+                return EditView.this.getSelectedText();
             }
+            return null;
+        }
 
-            if (text != null && text.length() > 0) {
-                mProcessingInput = true;
-                mLastCommittedText = text.toString();
-                mLastInputTime = currentTime;
+        @Override
+        public int getCursorCapsMode(int reqModes) {
+            if (mCursorIndex <= 0) return 0;
+            // Simplified caps mode detection
+            return super.getCursorCapsMode(reqModes);
+        }
 
-                // Call insert to handle the text and trigger auto-complete
-                insert(text.toString());
+        @Override
+        public boolean commitText(CharSequence text, int newCursorPosition) {
+            if (text != null) {
+                int start = isSelectMode ? getSelectionStart() : mCursorIndex;
+                int end = isSelectMode ? getSelectionEnd() : mCursorIndex;
 
-                postDelayed(new Runnable() {
-                    @Override
-                    public void run() {
-                        mProcessingInput = false;
-                    }
-                }, INPUT_DEBOUNCE_DELAY);
+                if (mComposingStart != -1 && mComposingEnd != -1) {
+                    start = Math.min(mComposingStart, mComposingEnd);
+                    end = Math.max(mComposingStart, mComposingEnd);
+                }
+
+                String textToCommit = text.toString();
+                if (mAutoIndentEnabled && textToCommit.equals("\n")) {
+                    textToCommit = "\n" + getAutoIndent(start);
+                }
+
+                // Reset composing region before replaceInternal to ensure
+                // onCursorOrSelectionChanged() reports finished composing state smoothly.
+                mComposingStart = mComposingEnd = -1;
+                isSelectMode = false;
+
+                // IME owns this edit — don't double-capture in our undo stack
+                mGapBuffer.setSuppressUndoCapture(true);
+                try {
+                    replaceInternal(start, end, textToCommit);
+                } finally {
+                    mGapBuffer.setSuppressUndoCapture(false);
+                }
+
                 return true;
             }
             return super.commitText(text, newCursorPosition);
@@ -3897,126 +5965,129 @@ public class EditView extends View {
 
         @Override
         public boolean setComposingText(CharSequence text, int newCursorPosition) {
-            Log.d(TAG, "setComposingText: '" + text + "', newCursor=" + newCursorPosition);
+            if (text != null) {
+                if (isSelectMode) {
+                    delete();
+                }
+                if (mComposingStart == -1) {
+                    mComposingStart = mCursorIndex;
+                    mComposingEnd = mCursorIndex;
+                }
+                int start = Math.min(mComposingStart, mComposingEnd);
+                int end = Math.max(mComposingStart, mComposingEnd);
 
-            // For composing text, we still want to handle it but not debounce
-            if (text != null && text.length() > 0) {
-                mProcessingInput = true;
-                insert(text.toString());
-                postDelayed(new Runnable() {
-                    @Override
-                    public void run() {
-                        mProcessingInput = false;
-                    }
-                }, INPUT_DEBOUNCE_DELAY);
+                // Set expected composing range before editing so that
+                // onCursorOrSelectionChanged() has correct boundaries.
+                mComposingStart = start;
+                mComposingEnd = start + text.length();
+
+                mGapBuffer.setSuppressUndoCapture(true);
+                try {
+                    replaceInternal(start, end, text.toString());
+                } finally {
+                    mGapBuffer.setSuppressUndoCapture(false);
+                }
+
                 return true;
             }
             return super.setComposingText(text, newCursorPosition);
         }
 
         @Override
-        public boolean deleteSurroundingText(int beforeLength, int afterLength) {
-            Log.d(TAG, "deleteSurroundingText: before=" + beforeLength + ", after=" + afterLength);
-
-            if (mProcessingInput) {
-                Log.d(TAG, "Skipping delete - processing input");
-                return true;
-            }
-
-            if (beforeLength > 0) {
-                for (int i = 0; i < beforeLength; i++) {
-                    delete();
-                }
-                return true;
-            } else if (afterLength > 0) {
-                for (int i = 0; i < afterLength; i++) {
-                    handleForwardDelete();
-                }
-                return true;
-            }
-            return super.deleteSurroundingText(beforeLength, afterLength);
+        public boolean setComposingRegion(int start, int end) {
+            mComposingStart = start;
+            mComposingEnd = end;
+            EditView.this.onCursorOrSelectionChanged();
+            return super.setComposingRegion(start, end);
         }
 
         @Override
-        public boolean deleteSurroundingTextInCodePoints(int beforeLength, int afterLength) {
-            Log.d(TAG, "deleteSurroundingTextInCodePoints: before=" + beforeLength + ", after=" + afterLength);
-            return deleteSurroundingText(beforeLength, afterLength);
+        public boolean finishComposingText() {
+            mComposingStart = mComposingEnd = -1;
+            EditView.this.onCursorOrSelectionChanged();
+            return super.finishComposingText();
+        }
+
+        @Override
+        public boolean setSelection(int start, int end) {
+            boolean result = super.setSelection(start, end);
+            EditView.this.setSelection(start, end);
+            return result;
         }
 
         @Override
         public boolean sendKeyEvent(KeyEvent event) {
-            Log.d(TAG, "sendKeyEvent: " + event.getKeyCode() + ", action=" + event.getAction());
-
-            // Skip key events if we're already processing input to avoid duplicates
-            if (mProcessingInput && event.getAction() == KeyEvent.ACTION_DOWN) {
-                Log.d(TAG, "Skipping key event - processing input");
-                return true;
-            }
-
-            // Let onKeyDown handle most keys, but ensure numbers and special chars work
             if (event.getAction() == KeyEvent.ACTION_DOWN) {
-                int keyCode = event.getKeyCode();
-
-                // Handle keys that might not be properly handled by onKeyDown
-                if (keyCode >= KeyEvent.KEYCODE_0 && keyCode <= KeyEvent.KEYCODE_9 ||
-                        keyCode >= KeyEvent.KEYCODE_NUMPAD_0 && keyCode <= KeyEvent.KEYCODE_NUMPAD_9 ||
-                        keyCode == KeyEvent.KEYCODE_SPACE) {
-
-                    int unicodeChar = event.getUnicodeChar();
-                    if (unicodeChar != 0) {
-                        mProcessingInput = true;
-                        insert(String.valueOf((char) unicodeChar));
-                        postDelayed(new Runnable() {
-                            @Override
-                            public void run() {
-                                mProcessingInput = false;
-                            }
-                        }, INPUT_DEBOUNCE_DELAY);
-                        return true;
-                    }
+                if (onKeyDown(event.getKeyCode(), event)) {
+                    return true;
                 }
-
-                return onKeyDown(keyCode, event);
             }
             return super.sendKeyEvent(event);
         }
 
         @Override
-        public boolean finishComposingText() {
-            Log.d(TAG, "finishComposingText");
+        public boolean deleteSurroundingText(int beforeLength, int afterLength) {
+            if (beforeLength <= 0 && afterLength <= 0) return true;
+
+            int spanStart = Selection.getSelectionStart(mGapBuffer);
+            int spanEnd = Selection.getSelectionEnd(mGapBuffer);
+
+            // If text is selected, any delete operation should first clear the selection
+            if ((spanStart >= 0 && spanEnd >= 0 && spanStart != spanEnd) || isSelectMode) {
+                delete();
+                return true;
+            }
+
+            int len = mGapBuffer.length();
+            int start = Math.max(0, mCursorIndex - beforeLength);
+            int end = Math.min(len, mCursorIndex + afterLength);
+
+            if (start != end) {
+                replaceInternal(start, end, "");
+            }
             return true;
         }
 
         @Override
-        public CharSequence getTextBeforeCursor(int length, int flags) {
-            try {
-                int start = Math.max(0, mCursorIndex - length);
-                String text = mGapBuffer.substring(start, mCursorIndex);
-                Log.d(TAG, "getTextBeforeCursor: " + text);
-                return text;
-            } catch (Exception e) {
-                Log.e(TAG, "Error in getTextBeforeCursor", e);
-                return "";
+        public boolean performContextMenuAction(int id) {
+            if (id == android.R.id.undo) {
+                undo();
+                return true;
             }
+            if (id == android.R.id.redo) {
+                redo();
+                return true;
+            }
+            if (id == android.R.id.copy) {
+                copy();
+                return true;
+            }
+            if (id == android.R.id.cut) {
+                cut();
+                return true;
+            }
+            if (id == android.R.id.paste) {
+                paste();
+                return true;
+            }
+            if (id == android.R.id.selectAll) {
+                selectAll();
+                return true;
+            }
+            return super.performContextMenuAction(id);
         }
 
         @Override
-        public CharSequence getTextAfterCursor(int length, int flags) {
-            try {
-                int end = Math.min(mGapBuffer.length(), mCursorIndex + length);
-                String text = mGapBuffer.substring(mCursorIndex, end);
-                Log.d(TAG, "getTextAfterCursor: " + text);
-                return text;
-            } catch (Exception e) {
-                Log.e(TAG, "Error in getTextAfterCursor", e);
-                return "";
-            }
-        }
-
-        @Override
-        public int getCursorCapsMode(int reqModes) {
-            // This helps with auto-capitalization
-            return TextUtils.getCapsMode(mGapBuffer.toString(), mCursorIndex, reqModes);
+        public android.view.inputmethod.ExtractedText getExtractedText(android.view.inputmethod.ExtractedTextRequest request, int flags) {
+            android.view.inputmethod.ExtractedText extracted = new android.view.inputmethod.ExtractedText();
+            extracted.text = mGapBuffer;
+            extracted.startOffset = 0;
+            extracted.selectionStart = getSelectionStart();
+            extracted.selectionEnd = getSelectionEnd();
+            extracted.flags = 0;
+            return extracted;
         }
     }
+
 }
+
