@@ -1,12 +1,13 @@
-apply plugin: 'com.android.library'
+plugins {
+    id 'com.android.library'
+}
 
 android {
-    namespace 'modder.hub.editor.lib'
-    compileSdkVersion 33
+    namespace = "modder.hub.editor.lib"
+    compileSdk = 33
 
     defaultConfig {
-        minSdkVersion 19
-        targetSdkVersion 26
+        minSdk = 19
     }
 
     buildTypes {
