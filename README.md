@@ -2,9 +2,6 @@
 [![Android CI](https://github.com/developer-krushna/MH-TextEditor/actions/workflows/android.yml/badge.svg)](https://github.com/developer-krushna/MH-TextEditor/actions/workflows/android.yml)
 A powerful, lightweight text editor for Android with syntax highlighting, smooth editing experience, and professional code editing features.
 
-> ⚠️ **Note:** This editor may not fully support some Android keyboards yet.  
-> Compatibility improvements are under active development as part of ongoing research.
-
 ---
 
 ## 📱 Screenshots
@@ -42,10 +39,43 @@ A powerful, lightweight text editor for Android with syntax highlighting, smooth
 - **Keyboard Support** — Full hardware keyboard support with meta keys  
 - **Input Method Support** — Optimized for various soft keyboards  
 
+### ⌨️ Computer Shortcuts
+
+MH-TextEditor supports standard desktop-style keyboard shortcuts for productivity:
+
+| Shortcut | Action |
+|----------|--------|
+| **Ctrl + A** | Select All |
+| **Ctrl + C** | Copy (Selection or Current Line) |
+| **Ctrl + X** | Cut (Selection or Current Line) |
+| **Ctrl + V** | Paste |
+| **Ctrl + Z** | Undo |
+| **Ctrl + Y** / **Ctrl + Shift + Z** | Redo |
+| **Ctrl + D** | Duplicate Current Line |
+| **Ctrl + L** | Select Current Line |
+| **Ctrl + Shift + L** | Delete Current Line |
+| **Ctrl + /** | Toggle Single-line Comment |
+| **Ctrl + I** | Increase Indent |
+| **Ctrl + Shift + I** | Decrease Indent |
+| **Ctrl + U** | Convert Selection to Lowercase |
+| **Ctrl + Shift + U** | Convert Selection to Uppercase |
+| **Tab** | Insert Tab / Indent Selection |
+| **Shift + Tab** | Decrease Indent |
+| **Ctrl + Backspace** | Delete Previous Word |
+| **Ctrl + Delete** | Delete Next Word |
+| **Home** / **End** | Move to Start / End of Line |
+| **Ctrl + Home** / **End** | Move to Start / End of File |
+| **Ctrl + Left** / **Right** | Move Cursor by Word |
+| **Page Up** / **Down** | Scroll Page Up / Down |
+
+---
+
 ### 🚀 Performance & UX
 
-- **Gap Buffer Implementation** — Efficient text storage for large files  
-- **Smooth Scrolling** — Physics-based scrolling with fling gestures  
+- **Gap Buffer Implementation** — Efficient text storage for large files 3M+ lines 
+- **Smooth Scrolling & zooming** — Physics-based scrolling with fling gestures
+- **Braces highlight** - Efficently highlight close bracket , braces
+- **Indent guidelines** — Eficently render and handling guide lines
 - **Cursor Blink** — Visual cursor indication with customizable blink rate  
 - **Touch Gestures** — Double-tap, long-press, and scroll gestures  
 - **Auto-complete** — Intelligent word completion and suggestions  
@@ -62,11 +92,6 @@ A powerful, lightweight text editor for Android with syntax highlighting, smooth
     android:id="@+id/editView"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-	android:layout_marginTop="0dp"
-    android:layout_marginStart="0dp"
-    android:paddingTop="0dp"
-    android:paddingStart="0dp" 
-    android:focusable="true"
     android:focusableInTouchMode="true"/>
 ```
 
@@ -90,14 +115,24 @@ editView.setAutoIndentEnabled(true);
 // Set typeface
 Typeface typeface = Typeface.MONOSPACE;
 editView.setTypeface(typeface);
-
+editView.setMenuStyle(ClipboardPanel.MenuDisplayMode.ICON_ONLY);
 // Set listeners
-editView.setOnTextChangedListener(new OnTextChangedListener() {
-    @Override
-    public void onTextChanged() {
-        // Handle text changes
-    }
-});
+editView.addTextChangedListener(new TextWatcher() {
+		@Override
+		public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+			// Log.d(TAG, "beforeTextChanged: " + s.length());
+		}
+
+		@Override
+		public void onTextChanged(CharSequence s, int start, int before, int count) {
+			// Log.d(TAG, "onTextChanged: " + s.length());
+		}
+
+		@Override
+		public void afterTextChanged(Editable s) {
+			// Log.d(TAG, "afterTextChanged: " + s.length());
+		}
+	});	
 ```
 
 ---
@@ -195,7 +230,6 @@ app/
 ├── editor/
 │   ├── EditView.java           # Main editor component
 │   ├── GapBuffer.java          # Efficient text storage
-│   ├── WordWrapLayout.java   # Word wrapping implementation(Not ready)
 │   ├── highlight/
 │   │   └── SyntaxConfig.java   # Syntax highlighting engine
 │   └── component/
@@ -257,9 +291,7 @@ writeFile(filePath, content);
    - Check input connection implementation  
 
 2. **Keyboard not supporting**  
-   - As of my test I have seen some keyboards are not working for the editor causing unexpected issues..
-   - So it's recommended to use Google Keyboard for testing now..
-   - I will try to improve the KeyUp and down function 
+   - As of my test currently all keyboards are supporting without any issues 
 
 3. **Syntax highlighting not working**  
    - Verify syntax definition files are in `assets`  
