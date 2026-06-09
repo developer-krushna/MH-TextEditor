@@ -39,6 +39,7 @@ import java.util.Map;
 import java.util.regex.Pattern;
 
 /**
+ * Author : @developer-krushna
  * Rule: Represents a single syntax highlighting rule. Each rule has a regex pattern, type (style
  * name), optional group styles, and priority.
  */

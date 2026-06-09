@@ -37,10 +37,10 @@ package modder.hub.editor.highlight;
 
 // Comment detection token
 public class CommentDef {
-    final String startsWith; // token that starts comment
-    final String endsWith; // optional end token (for block comments on same line)
+    public final String startsWith; // token that starts comment
+    public final String endsWith; // optional end token (for block comments on same line)
 
-    CommentDef(String s, String e) {
+    public CommentDef(String s, String e) {
         this.startsWith = s;
         this.endsWith = e;
     }

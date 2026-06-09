@@ -1,49 +1,66 @@
 /*
-* MH-TextEditor - An Advanced and optimized TextEditor for android
-* Copyright 2025, developer-krushna
-*
-* Redistribution and use in source and binary forms, with or without
-* modification, are permitted provided that the following conditions are
-* met:
-*
-*     * Redistributions of source code must retain the above copyright
-* notice, this list of conditions and the following disclaimer.
-*     * Redistributions in binary form must reproduce the above
-* copyright notice, this list of conditions and the following disclaimer
-* in the documentation and/or other materials provided with the
-* distribution.
-*     * Neither the name of developer-krushna nor the names of its
-* contributors may be used to endorse or promote products derived from
-* this software without specific prior written permission.
-*
-* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-* "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-* LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-* A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-* OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-* SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-* LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-* DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-* THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-* (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-* OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * MH-TextEditor - An Advanced and optimized TextEditor for android
+ * Copyright 2025-26, developer-krushna
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are
+ * met:
+ *
+ *     * Redistributions of source code must retain the above copyright
+ * notice, this list of conditions and the following disclaimer.
+ *     * Redistributions in binary form must reproduce the above
+ * copyright notice, this list of conditions and the following disclaimer
+ * in the documentation and/or other materials provided with the
+ * distribution.
+ *     * Neither the name of developer-krushna nor the names of its
+ * contributors may be used to endorse or promote products derived from
+ * this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
-*     Please contact Krushna by email modder-hub@zohomail.in if you need
-*     additional information or have any questions
-*/
+ *     Please contact Krushna by email mt.modder.hub@gmail.in if you need
+ *     additional information or have any questions
+ */
 
 package modder.hub.editor.highlight;
 
+import android.text.StaticLayout;
 import java.util.List;
 
-/** LineResult: tokens + optional full-line background color */
+/**
+ * Author : Krushna Chandra Maharna(@developer-krushna)
+ * Helper class for line result catcher
+ */
 public class LineResult {
     public List<Token> tokens;
-    public Integer backgroundColor; // null if none
+    public Integer backgroundColor;
+    public StaticLayout layout;
+    public String text;
+    public int endState;
+    public int width;
+    public int startBraceLevel;
+    public int endBraceLevel;
+    public int wrapIndent;
+    public int[] shiftMap;
 
-    public LineResult(List<Token> t, Integer bg) {
-        tokens = t;
-        backgroundColor = bg;
+    public int rightIndent = 0;
+
+    public LineResult(List<Token> tokens, Integer backgroundColor, int endState, int startBraceLevel, int endBraceLevel) {
+        this.tokens = tokens;
+        this.backgroundColor = backgroundColor;
+        this.endState = endState;
+        this.startBraceLevel = startBraceLevel;
+        this.endBraceLevel = endBraceLevel;
     }
 }

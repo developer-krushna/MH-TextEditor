@@ -1,6 +1,6 @@
 /*
 * MH-TextEditor - An Advanced and optimized TextEditor for android
-* Copyright 2025, developer-krushna
+* Copyright 2025-26, developer-krushna
 *
 * Redistribution and use in source and binary forms, with or without
 * modification, are permitted provided that the following conditions are
@@ -29,7 +29,7 @@
 * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
-*     Please contact Krushna by email modder-hub@zohomail.in if you need
+*     Please contact Krushna by email mt.modder.hub@gmail.in if you need
 *     additional information or have any questions
 */
 
