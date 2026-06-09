@@ -1,6 +1,14 @@
 package modder.hub.editor.buffer;
 
-import java.util.LinkedList;
+import android.text.Editable;
+import android.text.GetChars;
+import android.text.InputFilter;
+import android.text.Selection;
+import android.text.Spannable;
+import android.text.Spanned;
+import android.text.TextWatcher;
+import java.util.ArrayList;
+import java.util.List;
 import modder.hub.editor.utils.Pair;
 
 /**
@@ -11,14 +19,27 @@ import modder.hub.editor.utils.Pair;
  */
 
 /** Re modification done by @developer-krushna Optimized some code config Known bugs are fixed */
-public class GapBuffer implements CharSequence {
+public class GapBuffer implements CharSequence, Editable, GetChars {
 
     private char[] _contents;
-    private int _gapStartIndex;
-    private int _gapEndIndex;
-    private int _lineCount;
+    private volatile int _gapStartIndex;
+    private volatile int _gapEndIndex;
+    private volatile int _lineCount;
     private BufferCache _cache;
     private UndoStack _undoStack;
+
+    // Span management
+    private final List<Object> mSpans = new ArrayList<>();
+    private final List<Integer> mSpanStarts = new ArrayList<>();
+    private final List<Integer> mSpanEnds = new ArrayList<>();
+    private final List<Integer> mSpanFlags = new ArrayList<>();
+    private InputFilter[] mFilters = new InputFilter[0];
+    private final List<TextWatcher> mWatchers = new ArrayList<>();
+
+    // Batch edit tracking
+    private int mBatchStart = -1;
+    private int mBatchBefore = 0;
+    private int mBatchAfter = 0;
 
     // Selection snapshots produced by last undo/redo
     private int _lastUndoSelStart = -1;
@@ -31,6 +52,12 @@ public class GapBuffer implements CharSequence {
 
     private final int EOF = '\uFFFF';
     private final int NEWLINE = '\n';
+
+    private boolean mSuppressUndoCapture = false;
+
+    public void setSuppressUndoCapture(boolean suppress) {
+        mSuppressUndoCapture = suppress;
+    }
 
     public GapBuffer() {
         _contents = new char[16]; // init size 16
@@ -314,13 +341,27 @@ public class GapBuffer implements CharSequence {
      *
      * <p>No error checking is done
      */
+
     public synchronized GapBuffer insert(int offset, String str, boolean capture) {
-        return insert(offset, str, capture, System.nanoTime());
+        return insert(offset, str, capture, System.currentTimeMillis());
     }
 
     public synchronized GapBuffer insert(int offset, String str,
             boolean capture, long timestamp) {
-        int length = str.length();
+        int bufLen = length();
+        if (offset < 0) offset = 0;
+        if (offset > bufLen) offset = bufLen;
+        
+        int length = str != null ? str.length() : 0;
+        if (length == 0) return this;
+        
+        if (isBatchEdit()) {
+            if (mBatchStart == -1 || offset < mBatchStart) mBatchStart = offset;
+            mBatchAfter += length;
+        } else {
+            sendBeforeTextChanged(offset, 0, length);
+        }
+        
         if (capture && length > 0) {
             _undoStack.captureInsert(offset, offset + length, timestamp);
         }
@@ -344,12 +385,23 @@ public class GapBuffer implements CharSequence {
             char c = str.charAt(i);
             if (c == NEWLINE) {
                 ++_lineCount;
+                // Optimization for 1M+ lines: index the file during load/large inserts
+                if (_lineCount % 1000 == 0) {
+                    _cache.updateEntry(_lineCount - 1, offset + i + 1);
+                }
             }
             _contents[_gapStartIndex] = c;
             ++_gapStartIndex;
         }
 
+        updateSpansForInsert(offset, length);
         _cache.invalidateCache(offset);
+        
+        if (!isBatchEdit()) {
+            sendOnTextChanged(offset, 0, length);
+            sendAfterTextChanged();
+        }
+        
         return GapBuffer.this;
     }
 
@@ -368,12 +420,29 @@ public class GapBuffer implements CharSequence {
      *
      * <p>No error checking is done
      */
+
     public synchronized GapBuffer delete(int start, int end, boolean capture) {
-        return delete(start, end, capture, System.nanoTime());
+        return delete(start, end, capture, System.currentTimeMillis());
     }
 
     public synchronized GapBuffer delete(int start, int end,
             boolean capture, long timestamp) {
+        int bufLen = length();
+        if (start < 0) start = 0;
+        if (start > bufLen) start = bufLen;
+        if (end < start) end = start;
+        if (end > bufLen) end = bufLen;
+
+        int len = end - start;
+        if (len <= 0) return this;
+        
+        if (isBatchEdit()) {
+            if (mBatchStart == -1 || start < mBatchStart) mBatchStart = start;
+            mBatchBefore += len;
+        } else {
+            sendBeforeTextChanged(start, len, 0);
+        }
+
         if (capture && start < end) {
             _undoStack.captureDelete(start, end, timestamp);
         }
@@ -390,7 +459,6 @@ public class GapBuffer implements CharSequence {
         }
 
         // increase gap size
-        int len = end - start;
         for (int i = 0; i < len; ++i) {
             --_gapStartIndex;
             if (_contents[_gapStartIndex] == NEWLINE) {
@@ -398,15 +466,264 @@ public class GapBuffer implements CharSequence {
             }
         }
 
+        updateSpansForDelete(start, end);
         _cache.invalidateCache(start);
+        
+        if (!isBatchEdit()) {
+            sendOnTextChanged(start, len, 0);
+            sendAfterTextChanged();
+        }
+        
         return GapBuffer.this;
     }
 
     public synchronized GapBuffer replace(int start, int end, String str, boolean capture) {
-        delete(start, end, capture);
-        insert(start, str, capture);
+        beginBatchEdit();
+        try {
+            delete(start, end, capture);
+            insert(start, str, capture);
+        } finally {
+            endBatchEdit();
+        }
         return GapBuffer.this;
     }
+
+    // --- Editable and Spannable implementations ---
+
+    private void sendBeforeTextChanged(int start, int before, int after) {
+        if (isBatchEdit()) return;
+        for (TextWatcher watcher : mWatchers) {
+            watcher.beforeTextChanged(this, start, before, after);
+        }
+    }
+
+    private void sendOnTextChanged(int start, int before, int after) {
+        if (isBatchEdit()) return;
+        for (TextWatcher watcher : mWatchers) {
+            watcher.onTextChanged(this, start, before, after);
+        }
+    }
+
+    private void sendAfterTextChanged() {
+        if (isBatchEdit()) return;
+        for (TextWatcher watcher : mWatchers) {
+            watcher.afterTextChanged(this);
+        }
+    }
+
+    public void addTextChangedListener(TextWatcher watcher) {
+        if (watcher != null && !mWatchers.contains(watcher)) {
+            mWatchers.add(watcher);
+        }
+    }
+
+    public void removeTextChangedListener(TextWatcher watcher) {
+        mWatchers.remove(watcher);
+    }
+
+    @Override
+    public Editable replace(int st, int en, CharSequence source, int start, int end) {
+        replace(st, en, source != null ? source.subSequence(start, end).toString() : "",
+                !mSuppressUndoCapture);
+        return this;
+    }
+
+    @Override
+    public Editable replace(int st, int en, CharSequence source) {
+        replace(st, en, source != null ? source.toString() : "",
+                !mSuppressUndoCapture);
+        return this;
+    }
+
+    @Override
+    public Editable insert(int where, CharSequence text, int start, int end) {
+        insert(where, text != null ? text.subSequence(start, end).toString() : "",
+                !mSuppressUndoCapture);
+        return this;
+    }
+
+    @Override
+    public Editable insert(int where, CharSequence text) {
+        insert(where, text != null ? text.toString() : "",
+                !mSuppressUndoCapture);
+        return this;
+    }
+
+    @Override
+    public Editable delete(int st, int en) {
+        delete(st, en, !mSuppressUndoCapture);
+        return this;
+    }
+
+    @Override
+    public Editable append(CharSequence text) {
+        append(text.toString(), true);
+        return this;
+    }
+
+    @Override
+    public Editable append(CharSequence text, int start, int end) {
+        append(text.subSequence(start, end).toString(), true);
+        return this;
+    }
+
+    @Override
+    public Editable append(char text) {
+        append(String.valueOf(text), true);
+        return this;
+    }
+
+    @Override
+    public void clear() {
+        delete(0, length(), true);
+    }
+
+    @Override
+    public synchronized void getChars(int start, int end, char[] dest, int destoff) {
+        if (start < 0 || end > length() || start > end) {
+            throw new IndexOutOfBoundsException();
+        }
+        int count = end - start;
+        if (count == 0) return;
+
+        int realStart = getRealIndex(start);
+        int realEnd = getRealIndex(end - 1) + 1;
+
+        if (realStart < _gapStartIndex && realEnd > _gapEndIndex) {
+            // Segment spans across the gap
+            int beforeGap = _gapStartIndex - realStart;
+            System.arraycopy(_contents, realStart, dest, destoff, beforeGap);
+            System.arraycopy(_contents, _gapEndIndex, dest, destoff + beforeGap, count - beforeGap);
+        } else {
+            // Segment is entirely on one side of the gap
+            System.arraycopy(_contents, realStart, dest, destoff, count);
+        }
+    }
+
+    @Override
+    public void setFilters(InputFilter[] filters) {
+        mFilters = filters;
+    }
+
+    @Override
+    public InputFilter[] getFilters() {
+        return mFilters;
+    }
+
+    @Override
+    public void setSpan(Object what, int start, int end, int flags) {
+        for (int i = 0; i < mSpans.size(); i++) {
+            if (mSpans.get(i) == what) {
+                mSpanStarts.set(i, start);
+                mSpanEnds.set(i, end);
+                mSpanFlags.set(i, flags);
+                return;
+            }
+        }
+        mSpans.add(what);
+        mSpanStarts.add(start);
+        mSpanEnds.add(end);
+        mSpanFlags.add(flags);
+    }
+
+    @Override
+    public void removeSpan(Object what) {
+        for (int i = 0; i < mSpans.size(); i++) {
+            if (mSpans.get(i) == what) {
+                mSpans.remove(i);
+                mSpanStarts.remove(i);
+                mSpanEnds.remove(i);
+                mSpanFlags.remove(i);
+                return;
+            }
+        }
+    }
+
+    @Override
+    @SuppressWarnings("unchecked")
+    public <T> T[] getSpans(int start, int end, Class<T> type) {
+        List<T> result = new ArrayList<>();
+        for (int i = 0; i < mSpans.size(); i++) {
+            Object span = mSpans.get(i);
+            if (type.isInstance(span)) {
+                int s = mSpanStarts.get(i);
+                int e = mSpanEnds.get(i);
+                if (s <= end && e >= start) {
+                    result.add((T) span);
+                }
+            }
+        }
+        return result.toArray((T[]) java.lang.reflect.Array.newInstance(type, result.size()));
+    }
+
+    @Override
+    public int getSpanStart(Object what) {
+        for (int i = 0; i < mSpans.size(); i++) {
+            if (mSpans.get(i) == what) return mSpanStarts.get(i);
+        }
+        return -1;
+    }
+
+    @Override
+    public int getSpanEnd(Object what) {
+        for (int i = 0; i < mSpans.size(); i++) {
+            if (mSpans.get(i) == what) return mSpanEnds.get(i);
+        }
+        return -1;
+    }
+
+    @Override
+    public int getSpanFlags(Object what) {
+        for (int i = 0; i < mSpans.size(); i++) {
+            if (mSpans.get(i) == what) return mSpanFlags.get(i);
+        }
+        return 0;
+    }
+
+    @Override
+    public int nextSpanTransition(int start, int limit, Class type) {
+        int best = limit;
+        for (int i = 0; i < mSpans.size(); i++) {
+            if (type == null || type.isInstance(mSpans.get(i))) {
+                int s = mSpanStarts.get(i);
+                int e = mSpanEnds.get(i);
+                if (s > start && s < best) best = s;
+                if (e > start && e < best) best = e;
+            }
+        }
+        return best;
+    }
+
+    public void clearSpans() {
+        mSpans.clear();
+        mSpanStarts.clear();
+        mSpanEnds.clear();
+        mSpanFlags.clear();
+    }
+
+    private void updateSpansForInsert(int offset, int length) {
+        for (int i = 0; i < mSpans.size(); i++) {
+            int start = mSpanStarts.get(i);
+            int end = mSpanEnds.get(i);
+            if (start >= offset) mSpanStarts.set(i, start + length);
+            if (end >= offset) mSpanEnds.set(i, end + length);
+        }
+    }
+
+    private void updateSpansForDelete(int start, int end) {
+        int length = end - start;
+        for (int i = 0; i < mSpans.size(); i++) {
+            int s = mSpanStarts.get(i);
+            int e = mSpanEnds.get(i);
+            if (s >= end) mSpanStarts.set(i, s - length);
+            else if (s > start) mSpanStarts.set(i, start);
+
+            if (e >= end) mSpanEnds.set(i, e - length);
+            else if (e > start) mSpanEnds.set(i, start);
+        }
+    }
+
+    // --- End Editable ---
 
     /**
      * Gets charCount number of consecutive characters starting from _gapStartIndex.
@@ -508,16 +825,10 @@ public class GapBuffer implements CharSequence {
     }
 
     private int getRealIndex(int index) {
-        // Handle all edge cases
-        if (index < 0) return 0;
-        if (index >= length()) return _contents.length - 1;
-
-        if (isBeforeGap(index)) {
+        if (index < _gapStartIndex) {
             return index;
         } else {
-            int realIndex = index + gapSize();
-            // Ensure we don't go beyond array bounds
-            return Math.min(realIndex, _contents.length - 1);
+            return index + gapSize();
         }
     }
 
@@ -532,25 +843,20 @@ public class GapBuffer implements CharSequence {
         return index < _gapStartIndex;
     }
 
-    public synchronized int getLineCount() {
+    public int getLineCount() {
         return _lineCount;
     }
 
     @Override
-    public synchronized int length() {
-        // TODO: Implement this method
-        return _contents.length - gapSize();
+    public int length() {
+        return _contents.length - (_gapEndIndex - _gapStartIndex);
     }
 
     @Override
     public synchronized String toString() {
-        // TODO: Implement this method
-        StringBuffer buf = new StringBuffer();
-        int len = this.length();
-        for (int i = 0; i < len; i++) {
-            buf.append(charAt(i));
-        }
-        return new String(buf);
+        int len = length();
+        if (len <= 0) return "";
+        return substring(0, len);
     }
 
     public boolean canUndo() {
@@ -561,19 +867,44 @@ public class GapBuffer implements CharSequence {
         return _undoStack.canRedo();
     }
 
-    public int undo() {
+    public synchronized int undo() {
         // clear last redo snapshot (avoid stale)
         _lastUndoSelStart = _lastUndoSelEnd = -1;
         _lastUndoSelMode = false;
-        int pos = _undoStack.undo();
-        // _undoStack will fill _lastUndo* fields (via inner class)
+
+        beginBatchEdit();
+        int pos = -1;
+        try {
+            pos = _undoStack.undo();
+            // Restore selection spans in the buffer so they are visible to the View
+            if (_lastUndoSelStart >= 0 && _lastUndoSelEnd >= 0) {
+                Selection.setSelection(this, _lastUndoSelStart, _lastUndoSelEnd);
+            } else if (pos >= 0) {
+                Selection.setSelection(this, pos);
+            }
+        } finally {
+            endBatchEdit();
+        }
         return pos;
     }
 
-    public int redo() {
+    public synchronized int redo() {
         _lastRedoSelStart = _lastRedoSelEnd = -1;
         _lastRedoSelMode = false;
-        int pos = _undoStack.redo();
+
+        beginBatchEdit();
+        int pos = -1;
+        try {
+            pos = _undoStack.redo();
+            // Restore selection spans in the buffer
+            if (_lastRedoSelStart >= 0 && _lastRedoSelEnd >= 0) {
+                Selection.setSelection(this, _lastRedoSelStart, _lastRedoSelEnd);
+            } else if (pos >= 0) {
+                Selection.setSelection(this, pos);
+            }
+        } finally {
+            endBatchEdit();
+        }
         return pos;
     }
 
@@ -619,11 +950,28 @@ public class GapBuffer implements CharSequence {
     }
 
     public void beginBatchEdit() {
+        if (!isBatchEdit()) {
+            mBatchStart = -1;
+            mBatchBefore = 0;
+            mBatchAfter = 0;
+        }
         _undoStack.beginBatchEdit();
     }
 
     public void endBatchEdit() {
         _undoStack.endBatchEdit();
+        if (!isBatchEdit()) {
+            if (mBatchStart != -1) {
+                for (TextWatcher watcher : mWatchers) {
+                    watcher.beforeTextChanged(this, mBatchStart, mBatchBefore, mBatchAfter);
+                    watcher.onTextChanged(this, mBatchStart, mBatchBefore, mBatchAfter);
+                    watcher.afterTextChanged(this);
+                }
+            }
+            mBatchStart = -1;
+            mBatchBefore = 0;
+            mBatchAfter = 0;
+        }
     }
 
     public boolean isBatchEdit() {
@@ -631,20 +979,23 @@ public class GapBuffer implements CharSequence {
     }
 
     class UndoStack {
-        private boolean _isBatchEdit;
+        private int _batchEditCount = 0;
         /* for grouping batch operations */
         private int _groupId;
         /* where new entries should go */
         private int _top;
         /* timestamp for the previous edit operation */
-        private long _lastEditTime = -1L; // Initialize to -1 to distinguish from valid timestamps
+        private long _lastEditTime = -1L;
 
-        private LinkedList<Action> _stack = new LinkedList<>();
+        private List<Action> _stack = new ArrayList<>();
 
-        private static final int MAX_UNDO_SIZE = 50000; // Max chars per undo action (~100KB);
-        // adjust as needed
+        private static final int MAX_UNDO_SIZE = 50000;
 
-        public final long MERGE_TIME = 1000000000;
+        // Remove the char limit — cap by number of operations instead
+        private static final int MAX_UNDO_OPERATIONS = 100000;
+
+        /** Merge window for continuous edits (e.g., typing). */
+        public static final long MERGE_TIME = 1000L;
 
         // Pending selection snapshots (set by GapBuffer.markSelectionBefore/After)
         private int _pendingSelBeforeStart = -1;
@@ -730,6 +1081,18 @@ public class GapBuffer implements CharSequence {
             _pendingSelAfterStart = s;
             _pendingSelAfterEnd = e;
             _pendingSelAfterMode = mode;
+            
+            // Immediately update the last action in the stack if it belongs to the current group.
+            // This ensures that 'redo' can restore the selection to what it was right after the edit.
+            if (_top > 0) {
+                Action lastAction = _stack.get(_top - 1);
+                // Check if it's the current group (or the one that just 'ended' by _groupId++ but is still relevant)
+                if (lastAction._group == _groupId || lastAction._group == _groupId - 1) {
+                    lastAction._selAfterStart = s;
+                    lastAction._selAfterEnd = e;
+                    lastAction._selAfterMode = mode;
+                }
+            }
         }
 
         /**
@@ -739,78 +1102,117 @@ public class GapBuffer implements CharSequence {
          */
         public void captureInsert(int start, int end, long time) {
             int len = end - start;
+            if (len <= 0) return;
             boolean mergeSuccess = false;
 
             if (canUndo()) {
                 Action action = _stack.get(_top - 1);
                 if (action instanceof InsertAction &&
                         (time - _lastEditTime) < MERGE_TIME &&
-                        start == action._end &&
-                        (action._end - action._start + len <= MAX_UNDO_SIZE)) {
-                    action._end += len;
+                        start == action._end) {
+
+                    InsertAction ia = (InsertAction) action;
+                    // Extend end — data will be re-read fresh on undo via recordData
+                    // but safer to build it incrementally
+                    if (ia._data == null) {
+                        ia._data = substring(ia._start, ia._end);
+                    }
+                    ia._end += len;
+                    // Append new chars — they are about to be inserted so read BEFORE insert
+                    // Actually at captureInsert time the chars are not yet in buffer,
+                    // so we cannot read them. Leave _data to be refreshed via recordData on undo.
+                    ia._data = null; // mark dirty — recordData will re-read correctly at undo time
+                    ia._selAfterStart = _pendingSelAfterStart;
+                    ia._selAfterEnd = _pendingSelAfterEnd;
+                    ia._selAfterMode = _pendingSelAfterMode;
                     mergeSuccess = true;
-                } else {
-                    action.recordData();
                 }
             }
 
-            if (!mergeSuccess && len <= MAX_UNDO_SIZE) {
+            if (!mergeSuccess) {
+                while (_stack.size() >= MAX_UNDO_OPERATIONS) {
+                    _stack.remove(0);
+                    if (_top > 0) _top--;
+                }
+
                 InsertAction a = new InsertAction(start, end, _groupId);
-                // copy pending selection-before into action
                 a._selBeforeStart = _pendingSelBeforeStart;
                 a._selBeforeEnd = _pendingSelBeforeEnd;
                 a._selBeforeMode = _pendingSelBeforeMode;
-                // also copy pending selection-after (if editor already set it)
                 a._selAfterStart = _pendingSelAfterStart;
                 a._selAfterEnd = _pendingSelAfterEnd;
                 a._selAfterMode = _pendingSelAfterMode;
-
+                // _data intentionally null — recordData reads it fresh at undo time
+                // which is CORRECT for inserts because the text IS in the buffer at that point
                 push(a);
 
-                if (!_isBatchEdit) {
+                if (_batchEditCount <= 0) {
                     _groupId++;
                 }
             }
             _lastEditTime = time;
         }
-
         /** Records a delete operation. Should be called before the deletion is actually done. */
         public void captureDelete(int start, int end, long time) {
             int len = end - start;
+            if (len <= 0) return;
             boolean mergeSuccess = false;
 
             if (canUndo()) {
                 Action action = _stack.get(_top - 1);
                 if (action instanceof DeleteAction &&
-                        (time - _lastEditTime) < MERGE_TIME &&
-                        end == action._start &&
-                        (action._end - start <= MAX_UNDO_SIZE)) {
-                    action._start = start;
-                    mergeSuccess = true;
-                } else {
-                    action.recordData();
+                        (time - _lastEditTime) < MERGE_TIME) {
+
+                    DeleteAction da = (DeleteAction) action;
+
+                    if (end == da._start) {
+                        // Backspace: new deletion is immediately before existing
+                        // Capture the new fragment NOW before gap moves
+                        String newFragment = substring(start, end);
+                        da._data = newFragment + (da._data != null ? da._data : "");
+                        da._start = start;
+                        da._selAfterStart = _pendingSelAfterStart;
+                        da._selAfterEnd = _pendingSelAfterEnd;
+                        da._selAfterMode = _pendingSelAfterMode;
+                        mergeSuccess = true;
+
+                    } else if (start == da._start) {
+                        // Forward delete: new deletion extends end forward
+                        String newFragment = substring(start, end);
+                        da._data = (da._data != null ? da._data : "") + newFragment;
+                        da._end = da._start + da._data.length();
+                        da._selAfterStart = _pendingSelAfterStart;
+                        da._selAfterEnd = _pendingSelAfterEnd;
+                        da._selAfterMode = _pendingSelAfterMode;
+                        mergeSuccess = true;
+                    }
                 }
             }
 
-            if (!mergeSuccess && len <= MAX_UNDO_SIZE) {
+            if (!mergeSuccess) {
+                while (_stack.size() >= MAX_UNDO_OPERATIONS) {
+                    _stack.remove(0);
+                    if (_top > 0) _top--;
+                }
+
                 DeleteAction a = new DeleteAction(start, end, _groupId);
+                // Always capture eagerly before gap moves
+                a._data = substring(start, end);
                 a._selBeforeStart = _pendingSelBeforeStart;
                 a._selBeforeEnd = _pendingSelBeforeEnd;
                 a._selBeforeMode = _pendingSelBeforeMode;
-
                 a._selAfterStart = _pendingSelAfterStart;
                 a._selAfterEnd = _pendingSelAfterEnd;
                 a._selAfterMode = _pendingSelAfterMode;
 
                 push(a);
 
-                if (!_isBatchEdit) {
+                if (_batchEditCount <= 0) {
                     _groupId++;
                 }
             }
             _lastEditTime = time;
         }
-
         private void push(Action action) {
             trimStack();
             _top++;
@@ -819,7 +1221,7 @@ public class GapBuffer implements CharSequence {
 
         private void trimStack() {
             while (_stack.size() > _top) {
-                _stack.removeLast();
+                _stack.remove(_stack.size() - 1);
             }
         }
 
@@ -832,16 +1234,19 @@ public class GapBuffer implements CharSequence {
         }
 
         public boolean isBatchEdit() {
-            return _isBatchEdit;
+            return _batchEditCount > 0;
         }
 
         public void beginBatchEdit() {
-            _isBatchEdit = true;
+            _batchEditCount++;
         }
 
         public void endBatchEdit() {
-            _isBatchEdit = false;
-            _groupId++;
+            _batchEditCount--;
+            if (_batchEditCount <= 0) {
+                _batchEditCount = 0;
+                _groupId++;
+            }
         }
 
         private abstract class Action {
@@ -853,8 +1258,6 @@ public class GapBuffer implements CharSequence {
             public String _data;
             /* Group ID. Commands of the same group are undo/redo as a unit */
             public int _group;
-            /* 750ms in nanoseconds */
-            public final long MERGE_TIME = 750000000L; // Fixed to 750ms as per comment
 
             // Selection snapshot BEFORE this action (or group)
             public int _selBeforeStart = -1;
@@ -882,7 +1285,6 @@ public class GapBuffer implements CharSequence {
              * continuous. See {@link UndoStack} for the requirements of a continuous edit.
              *
              * @param start Start position of the new edit
-             * @param length Length of the newly edited segment
              * @param time Timestamp when the new edit was made. There are no restrictions on the
              *     units used, as long as it is consistently used in the whole program
              * @return Whether the merge was successful
@@ -904,7 +1306,7 @@ public class GapBuffer implements CharSequence {
                     return false;
                 }
 
-                if ((time - _lastEditTime) < MERGE_TIME
+                if ((time - _lastEditTime) < UndoStack.MERGE_TIME
                         && start == _end) {
                     _end += end - start;
                     trimStack();
@@ -914,20 +1316,15 @@ public class GapBuffer implements CharSequence {
             }
 
             @Override
-            public void recordData() {
-                // TODO handle memory allocation failure
-                _data = substring(_start, _end);
+            public void undo() {
+                // For inserts: text IS still in buffer at undo time, safe to read now
+                recordData();
+                delete(_start, _end, false, 0);
             }
 
             @Override
-            public void undo() {
-                if (_data == null) {
-                    recordData();
-                    shiftGapStart(-(_end - _start));
-                } else {
-                    // dummy timestamp of 0
-                    delete(_start, _end, false, 0);
-                }
+            public void recordData() {
+                _data = substring(_start, Math.min(_end, length()));
             }
 
             @Override
@@ -964,7 +1361,7 @@ public class GapBuffer implements CharSequence {
                     return false;
                 }
 
-                if ((time - _lastEditTime) < MERGE_TIME
+                if ((time - _lastEditTime) < UndoStack.MERGE_TIME
                         && end == _start) {
                     _start = start;
                     trimStack();
@@ -975,17 +1372,14 @@ public class GapBuffer implements CharSequence {
 
             @Override
             public void recordData() {
-                // TODO handle memory allocation failure
-                _data = new String(gapSubSequence(_end - _start));
+                // Safe substring read — never use gapSubSequence
+                _data = substring(_start, _end);
             }
 
             @Override
             public void undo() {
-                if (_data == null) {
-                    recordData();
-                    shiftGapStart(_end - _start);
-                } else {
-                    // dummy timestamp of 0
+                // _data always captured eagerly at captureDelete time
+                if (_data != null) {
                     insert(_start, _data, false, 0);
                 }
             }

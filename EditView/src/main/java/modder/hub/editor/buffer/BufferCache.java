@@ -1,113 +1,94 @@
-/**
- * A LRU cache that stores the last seek line and its corresponding index so that future lookups can
- * start from the cached position instead of the beginning of the file
- *
- * <p>_cache.Pair.First = line index _cache.Pair.Second = character offset of first character in
- * that line
- *
- * <p>TextBufferCache always has one valid entry (0,0) signifying that in line 0, the first
- * character is at offset 0. This is true even for an "empty" file, which is not really empty
- * because TextBuffer inserts a EOF character in it.
- *
- * <p>Therefore, _cache[0] is always occupied by the entry (0,0). It is not affected by
- * invalidateCache, cache miss, etc. operations
- */
 package modder.hub.editor.buffer;
 
+import java.util.Arrays;
 import modder.hub.editor.utils.Pair;
 
+/**
+ * An optimized line/offset cache using sorted arrays and binary search.
+ * This provides O(log N) lookup and is much more efficient than an LRU cache for 2M+ lines.
+ */
 public class BufferCache {
-    private final int CACHE_SIZE = 4; // minimum = 1
-    private Pair<Integer, Integer>[] _cache;
+    private int[] lineIndices;
+    private int[] charOffsets;
+    private int size;
+    private static final int INITIAL_CAPACITY = 1024;
 
     public BufferCache() {
-        _cache = new Pair[CACHE_SIZE];
-        _cache[0] = new Pair<Integer, Integer>(0, 0); // invariant lineIndex and charOffset relation
-        for (int i = 1; i < CACHE_SIZE; ++i) {
-            _cache[i] = new Pair<Integer, Integer>(-1, -1);
-            // -1 line index is used implicitly in calculations in getNearestMatch
+        lineIndices = new int[INITIAL_CAPACITY];
+        charOffsets = new int[INITIAL_CAPACITY];
+        lineIndices[0] = 0;
+        charOffsets[0] = 0;
+        size = 1;
+    }
+
+    public synchronized Pair<Integer, Integer> getNearestLine(int lineIndex) {
+        int idx = Arrays.binarySearch(lineIndices, 0, size, lineIndex);
+        if (idx >= 0) {
+            return new Pair<>(lineIndices[idx], charOffsets[idx]);
+        } else {
+            int insertionPoint = -(idx + 1);
+            int nearestIdx = Math.max(0, insertionPoint - 1);
+            return new Pair<>(lineIndices[nearestIdx], charOffsets[nearestIdx]);
         }
     }
 
-    // TODO consider extracting common parts with getNearestCharOffset(int)
-    public Pair<Integer, Integer> getNearestLine(int lineIndex) {
-        int nearestMatch = 0;
-        int nearestDistance = Integer.MAX_VALUE;
-        for (int i = 0; i < CACHE_SIZE; ++i) {
-            int distance = Math.abs(lineIndex - _cache[i].first);
-            if (distance < nearestDistance) {
-                nearestDistance = distance;
-                nearestMatch = i;
+    public synchronized Pair<Integer, Integer> getNearestCharOffset(int charOffset) {
+        int idx = Arrays.binarySearch(charOffsets, 0, size, charOffset);
+        if (idx >= 0) {
+            return new Pair<>(lineIndices[idx], charOffsets[idx]);
+        } else {
+            int insertionPoint = -(idx + 1);
+            int nearestIdx = Math.max(0, insertionPoint - 1);
+            return new Pair<>(lineIndices[nearestIdx], charOffsets[nearestIdx]);
+        }
+    }
+
+    public synchronized void updateEntry(int lineIndex, int charOffset) {
+        if (lineIndex <= 0) return;
+
+        int idx = Arrays.binarySearch(lineIndices, 0, size, lineIndex);
+        if (idx >= 0) {
+            charOffsets[idx] = charOffset;
+        } else {
+            int insertionPoint = -(idx + 1);
+            
+            // To prevent the cache from growing too large and slowing down updates (O(N) shift),
+            // we only insert if the distance to the nearest cached line is significant.
+            int prevIdx = insertionPoint - 1;
+            if (prevIdx >= 0 && lineIndex - lineIndices[prevIdx] < 100) {
+                // Already have a nearby entry, don't bloat the cache
+                return;
             }
-        }
 
-        Pair<Integer, Integer> nearestEntry = _cache[nearestMatch];
-        makeHead(nearestMatch);
-        return nearestEntry;
-    }
-
-    public Pair<Integer, Integer> getNearestCharOffset(int charOffset) {
-        int nearestMatch = 0;
-        int nearestDistance = Integer.MAX_VALUE;
-        for (int i = 0; i < CACHE_SIZE; ++i) {
-            int distance = Math.abs(charOffset - _cache[i].second);
-            if (distance < nearestDistance) {
-                nearestDistance = distance;
-                nearestMatch = i;
-            }
-        }
-
-        Pair<Integer, Integer> nearestEntry = _cache[nearestMatch];
-        makeHead(nearestMatch);
-        return nearestEntry;
-    }
-
-    /** Place _cache[newHead] at the top of the list */
-    private void makeHead(int newHead) {
-        if (newHead == 0) {
-            return; // nothing to do for _cache[0]
-        }
-
-        Pair<Integer, Integer> temp = _cache[newHead];
-        for (int i = newHead; i > 1; --i) {
-            _cache[i] = _cache[i - 1];
-        }
-        _cache[1] = temp; // _cache[0] is always occupied by (0,0)
-    }
-
-    public void updateEntry(int lineIndex, int charOffset) {
-        if (lineIndex <= 0) {
-            // lineIndex 0 always has 0 charOffset; ignore. Also ignore negative lineIndex
-            return;
-        }
-
-        if (!replaceEntry(lineIndex, charOffset)) {
-            insertEntry(lineIndex, charOffset);
+            ensureCapacity(size + 1);
+            System.arraycopy(lineIndices, insertionPoint, lineIndices, insertionPoint + 1, size - insertionPoint);
+            System.arraycopy(charOffsets, insertionPoint, charOffsets, insertionPoint + 1, size - insertionPoint);
+            lineIndices[insertionPoint] = lineIndex;
+            charOffsets[insertionPoint] = charOffset;
+            size++;
         }
     }
 
-    private boolean replaceEntry(int lineIndex, int charOffset) {
-        for (int i = 1; i < CACHE_SIZE; ++i) {
-            if (_cache[i].first == lineIndex) {
-                _cache[i].second = charOffset;
-                return true;
-            }
+    private void ensureCapacity(int minCapacity) {
+        if (minCapacity > lineIndices.length) {
+            int newCapacity = lineIndices.length * 2;
+            if (newCapacity < minCapacity) newCapacity = minCapacity;
+            lineIndices = Arrays.copyOf(lineIndices, newCapacity);
+            charOffsets = Arrays.copyOf(charOffsets, newCapacity);
         }
-        return false;
-    }
-
-    private void insertEntry(int lineIndex, int charOffset) {
-        makeHead(CACHE_SIZE - 1); // rotate right list of entries
-        // replace head (most recently used entry) with new entry
-        _cache[1] = new Pair<Integer, Integer>(lineIndex, charOffset);
     }
 
     /** Invalidate all cache entries that have char offset >= fromCharOffset */
-    public void invalidateCache(int fromCharOffset) {
-        for (int i = 1; i < CACHE_SIZE; ++i) {
-            if (_cache[i].second >= fromCharOffset) {
-                _cache[i] = new Pair<Integer, Integer>(-1, -1);
-            }
+    public synchronized void invalidateCache(int fromCharOffset) {
+        int idx = Arrays.binarySearch(charOffsets, 0, size, fromCharOffset);
+        if (idx < 0) {
+            idx = -(idx + 1);
+        }
+        // idx is the first entry to invalidate.
+        // We always keep entry 0 (0,0).
+        if (idx == 0) idx = 1;
+        if (idx < size) {
+            size = idx;
         }
     }
 }
