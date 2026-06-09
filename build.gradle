@@ -1,0 +1,22 @@
+// build.gradle (Root level)
+buildscript {
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        // You may need to adjust this version based on your Android Studio version
+        classpath 'com.android.tools.build:gradle:9.2.1'
+    }
+}
+
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+task clean(type: Delete) {
+    delete rootProject.buildDir
+}
