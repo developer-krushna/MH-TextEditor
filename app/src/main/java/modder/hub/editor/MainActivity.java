@@ -1,6 +1,7 @@
 package modder.hub.editor;
 
 import android.Manifest;
+import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.DialogInterface;
@@ -30,22 +31,20 @@ import android.widget.PopupMenu;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
-import java.io.BufferedWriter;
+import android.util.Log;
+
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
-import modder.hub.editor.EditView;
-import modder.hub.editor.R;
+import java.util.Set;
+
 import modder.hub.editor.buffer.GapBuffer;
 import modder.hub.editor.component.ClipboardPanel;
 import modder.hub.editor.listener.OnTextChangedListener;
@@ -65,6 +64,8 @@ public class MainActivity extends Activity {
     private SharedPreferences editor_pref;
 
     private Charset mDefaultCharset = StandardCharsets.UTF_8;
+    private String mLineSeparator = "\n";
+    private boolean mFileModifiedManually = false;
     private String externalPath = File.separator;
 
     private EditText edittext_replace, edittext_find;
@@ -81,6 +82,7 @@ public class MainActivity extends Activity {
             "#", "@", "`"
     );
 
+    @SuppressLint("HandlerLeak")
     private Handler mHandler = new Handler() {
         @Override
         public void handleMessage(Message msg) {
@@ -118,6 +120,13 @@ public class MainActivity extends Activity {
         functionBar = findViewById(R.id.functionBar);
 
         editView = new EditView(this);
+        editView.setWordWrap(editor_pref.getBoolean("word_wrap", false));
+        editView.setAutoCompleteEnabled(editor_pref.getBoolean("auto_complete", true));
+        editView.setShowLineNumbers(editor_pref.getBoolean("show_line_numbers", true));
+        editView.setStickyLineNumbers(editor_pref.getBoolean("sticky_line_numbers", true));
+        editView.setShowIndentGuides(editor_pref.getBoolean("show_indent_guides", true));
+        editView.setShowWrapArrows(editor_pref.getBoolean("show_wrap_arrows", true));
+        editView.setAutoIndentEnabled(editor_pref.getBoolean("auto_indent", true));
     }
 
     private void initializeLogic() {
@@ -128,8 +137,8 @@ public class MainActivity extends Activity {
         ));
 
         editorContainer.addView(editView);
-        editorContainer.setFocusableInTouchMode(true);
-        editView.requestFocus();
+
+        loadSmaliInstructions();
 
         addFunctionBar(functionBar, editView);
 
@@ -157,12 +166,34 @@ public class MainActivity extends Activity {
             }
         }
 
-        editView.setSyntaxDarkMode(false);
+        editView.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+                // Log.d(TAG, "beforeTextChanged: " + s.length());
+            }
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                // Log.d(TAG, "onTextChanged: " + s.length());
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {
+                // Log.d(TAG, "afterTextChanged: " + s.length());
+            }
+        });
+      //  editView.setSyntaxDarkMode(false);
         editView.setOnTextChangedListener(new OnTextChangedListener() {
             @Override
             public void onTextChanged() {
                 mHandler.sendEmptyMessage(0);
                 editView.postInvalidate();
+            }
+        });
+        editView.setOnSelectionChangeListener(new EditView.OnSelectionChangeListener() {
+            @Override
+            public void onSelectionChanged(int start, int end) {
+                mHandler.sendEmptyMessage(0);
             }
         });
         if (mSharedPreference.contains("path")) {
@@ -199,6 +230,39 @@ public class MainActivity extends Activity {
         }
     }
 
+    private void loadSmaliInstructions() {
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    InputStream is = getAssets().open("smali_instructions.json");
+                    int size = is.available();
+                    byte[] buffer = new byte[size];
+                    int bytesRead = is.read(buffer);
+                    is.close();
+                    if (bytesRead > 0) {
+                        String json = new String(buffer, 0, bytesRead, StandardCharsets.UTF_8);
+                        final org.json.JSONArray array = new org.json.JSONArray(json);
+                        final Set<String> instructions = new HashSet<String>();
+                        for (int i = 0; i < array.length(); i++) {
+                            instructions.add(array.getString(i));
+                        }
+                        runOnUiThread(new Runnable() {
+                            @Override
+                            public void run() {
+                                if (editView != null) {
+                                    editView.setInstructions(instructions);
+                                }
+                            }
+                        });
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "Error loading Smali instructions", e);
+                }
+            }
+        }).start();
+    }
+
     private void toggleEditMode() {
         editView.setEditedMode(!editView.getEditedMode());
         mHandler.sendEmptyMessage(0);
@@ -217,12 +281,18 @@ public class MainActivity extends Activity {
         MenuItem saveMenu = menu.findItem(R.id.save);
         MenuItem undo = menu.findItem(R.id.undo);
         undo.setIcon(R.drawable.ic_undo);
+        if (editView.canUndo() || mFileModifiedManually) {
+            saveMenu.getIcon().setTint(Color.WHITE);
+            saveMenu.setEnabled(true);
+        } else {
+            saveMenu.getIcon().setTint(Color.GRAY);
+            saveMenu.setEnabled(false);
+        }
+
         if (editView.canUndo()) {
             undo.getIcon().setTint(Color.WHITE);
             undo.setEnabled(true);
-            saveMenu.getIcon().setTint(Color.WHITE);
         } else {
-            saveMenu.getIcon().setTint(Color.GRAY);
             undo.getIcon().setTint(Color.GRAY);
             undo.setEnabled(false);
         }
@@ -235,6 +305,23 @@ public class MainActivity extends Activity {
             redo.getIcon().setTint(Color.GRAY);
             redo.setEnabled(false);
         }
+
+        // Line Break selection
+        if (mLineSeparator.equals("\n")) menu.findItem(R.id.eol_unix).setChecked(true);
+        else if (mLineSeparator.equals("\r\n")) menu.findItem(R.id.eol_windows).setChecked(true);
+        else if (mLineSeparator.equals("\r")) menu.findItem(R.id.eol_mac).setChecked(true);
+
+        // Encoding selection
+        String charsetName = mDefaultCharset.name().toUpperCase();
+        if (charsetName.contains("UTF-8")) menu.findItem(R.id.enc_utf8).setChecked(true);
+        else if (charsetName.contains("UTF-16LE")) menu.findItem(R.id.enc_utf16le).setChecked(true);
+        else if (charsetName.contains("UTF-16BE")) menu.findItem(R.id.enc_utf16be).setChecked(true);
+        else if (charsetName.contains("GBK")) menu.findItem(R.id.enc_gbk).setChecked(true);
+        else if (charsetName.contains("BIG5")) menu.findItem(R.id.enc_big5).setChecked(true);
+        else if (charsetName.contains("1251")) menu.findItem(R.id.enc_win1251).setChecked(true);
+        else if (charsetName.contains("1252")) menu.findItem(R.id.enc_win1252).setChecked(true);
+        else if (charsetName.contains("1258")) menu.findItem(R.id.enc_win1258).setChecked(true);
+
         MenuItem editMode = menu.findItem(R.id.read_only);
 
         if (editView.getEditedMode()) {
@@ -242,6 +329,40 @@ public class MainActivity extends Activity {
         } else {
             editMode.setChecked(true);
         }
+
+        MenuItem wordWrap = menu.findItem(R.id.word_wrap);
+        wordWrap.setChecked(editView.isWordWrap());
+
+        MenuItem autoComplete = menu.findItem(R.id.auto_complete);
+        autoComplete.setChecked(editView.isAutoCompleteEnabled());
+
+        MenuItem showLineNumbers = menu.findItem(R.id.show_line_numbers);
+        showLineNumbers.setChecked(editView.isShowLineNumbers());
+
+        MenuItem stickyLineNumbers = menu.findItem(R.id.sticky_line_numbers);
+        stickyLineNumbers.setChecked(editView.isStickyLineNumbers());
+
+        MenuItem showIndentGuides = menu.findItem(R.id.show_indent_guides);
+        showIndentGuides.setChecked(editView.isShowIndentGuides());
+
+        MenuItem showWrapArrows = menu.findItem(R.id.show_wrap_arrows);
+        showWrapArrows.setChecked(editView.isShowWrapArrows());
+
+        MenuItem autoIndent = menu.findItem(R.id.auto_indent);
+        autoIndent.setChecked(editView.isAutoIndentEnabled());
+
+        MenuItem prevPos = menu.findItem(R.id.prev_pos);
+        prevPos.setEnabled(editView.canGoBack());
+        if (prevPos.getIcon() != null) {
+            prevPos.getIcon().setAlpha(editView.canGoBack() ? 255 : 128);
+        }
+
+        MenuItem nextPos = menu.findItem(R.id.next_pos);
+        nextPos.setEnabled(editView.canGoForward());
+        if (nextPos.getIcon() != null) {
+            nextPos.getIcon().setAlpha(editView.canGoForward() ? 255 : 128);
+        }
+
         return super.onPrepareOptionsMenu(menu);
     }
 
@@ -253,77 +374,131 @@ public class MainActivity extends Activity {
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-        switch (item.getItemId()) {
-            case R.id.undo:
-                editView.undo();
-                break;
-            case R.id.search:
-                searchPanel();
-                break;
-            case R.id.redo:
-                editView.redo();
-                break;
-            case R.id.read_only:
-                search_pad.setVisibility(View.GONE);
-                toggleEditMode();
-                break;
-            case R.id.openFile:
-                showOpenFileDialog();
-                break;
-            case R.id.gotoLine:
-                showGotoLineDialog();
-                break;
-            case R.id.changeSyntax:
-                _syntaxSelection();
-                break;
-            case R.id.preference:
-                menuStyle();
-                break;
-            case R.id.save:
-                break;
-            case R.id.delete_line:
-                editView.deleteLine();
-                return true;
-
-            case R.id.empty_line:
-                editView.emptyLine();
-                return true;
-
-            case R.id.replace_line:
-                editView.replaceLine();
-                return true;
-
-            case R.id.duplicate_line:
-                editView.duplicateLine();
-                return true;
-
-            case R.id.toggle_comment:
-                editView.toggleComment();
-                return true;
-
-            case R.id.copy_line:
-                editView.copyLine();
-                return true;
-
-            case R.id.cut_line:
-                editView.cutLine();
-                return true;
-
-            case R.id.convert_uppercase:
-                editView.convertSelectionToUpperCase();
-                return true;
-
-            case R.id.convert_lowercase:
-                editView.convertSelectionToLowerCase();
-                return true;
-
-            case R.id.increase_indent:
-                editView.increaseIndent();
-                return true;
-
-            case R.id.decrease_indent:
-                editView.decreaseIndent();
-                return true;
+        int id = item.getItemId();
+        if (id == R.id.undo) {
+            editView.undo();
+        } else if (id == R.id.search) {
+            searchPanel();
+        } else if (id == R.id.redo) {
+            editView.redo();
+        } else if (id == R.id.read_only) {
+            search_pad.setVisibility(View.GONE);
+            toggleEditMode();
+        } else if (id == R.id.word_wrap) {
+            editView.setWordWrap(!editView.isWordWrap());
+            editor_pref.edit().putBoolean("word_wrap", editView.isWordWrap()).apply();
+        } else if (id == R.id.auto_complete) {
+            editView.setAutoCompleteEnabled(!editView.isAutoCompleteEnabled());
+            editor_pref.edit().putBoolean("auto_complete", editView.isAutoCompleteEnabled()).apply();
+        } else if (id == R.id.show_line_numbers) {
+            editView.setShowLineNumbers(!editView.isShowLineNumbers());
+            editor_pref.edit().putBoolean("show_line_numbers", editView.isShowLineNumbers()).apply();
+        } else if (id == R.id.sticky_line_numbers) {
+            editView.setStickyLineNumbers(!editView.isStickyLineNumbers());
+            editor_pref.edit().putBoolean("sticky_line_numbers", editView.isStickyLineNumbers()).apply();
+        } else if (id == R.id.show_indent_guides) {
+            editView.setShowIndentGuides(!editView.isShowIndentGuides());
+            editor_pref.edit().putBoolean("show_indent_guides", editView.isShowIndentGuides()).apply();
+        } else if (id == R.id.show_wrap_arrows) {
+            editView.setShowWrapArrows(!editView.isShowWrapArrows());
+            editor_pref.edit().putBoolean("show_wrap_arrows", editView.isShowWrapArrows()).apply();
+        } else if (id == R.id.auto_indent) {
+            editView.setAutoIndentEnabled(!editView.isAutoIndentEnabled());
+            editor_pref.edit().putBoolean("auto_indent", editView.isAutoIndentEnabled()).apply();
+        } else if (id == R.id.eol_unix) {
+            mLineSeparator = "\n";
+            mFileModifiedManually = true;
+            mHandler.sendEmptyMessage(0);
+        } else if (id == R.id.eol_windows) {
+            mLineSeparator = "\r\n";
+            mFileModifiedManually = true;
+            mHandler.sendEmptyMessage(0);
+        } else if (id == R.id.eol_mac) {
+            mLineSeparator = "\r";
+            mFileModifiedManually = true;
+            mHandler.sendEmptyMessage(0);
+        } else if (id == R.id.enc_utf8) {
+            mDefaultCharset = StandardCharsets.UTF_8;
+            mFileModifiedManually = true;
+            mHandler.sendEmptyMessage(0);
+        } else if (id == R.id.enc_utf16le) {
+            mDefaultCharset = Charset.forName("UTF-16LE");
+            mFileModifiedManually = true;
+            mHandler.sendEmptyMessage(0);
+        } else if (id == R.id.enc_utf16be) {
+            mDefaultCharset = Charset.forName("UTF-16BE");
+            mFileModifiedManually = true;
+            mHandler.sendEmptyMessage(0);
+        } else if (id == R.id.enc_gbk) {
+            mDefaultCharset = Charset.forName("GBK");
+            mFileModifiedManually = true;
+            mHandler.sendEmptyMessage(0);
+        } else if (id == R.id.enc_big5) {
+            mDefaultCharset = Charset.forName("Big5");
+            mFileModifiedManually = true;
+            mHandler.sendEmptyMessage(0);
+        } else if (id == R.id.enc_win1251) {
+            mDefaultCharset = Charset.forName("windows-1251");
+            mFileModifiedManually = true;
+            mHandler.sendEmptyMessage(0);
+        } else if (id == R.id.enc_win1252) {
+            mDefaultCharset = Charset.forName("windows-1252");
+            mFileModifiedManually = true;
+            mHandler.sendEmptyMessage(0);
+        } else if (id == R.id.enc_win1258) {
+            mDefaultCharset = Charset.forName("windows-1258");
+            mFileModifiedManually = true;
+            mHandler.sendEmptyMessage(0);
+        } else if (id == R.id.prev_pos) {
+            editView.goBack();
+        } else if (id == R.id.next_pos) {
+            editView.goForward();
+        } else if (id == R.id.openFile) {
+            showOpenFileDialog();
+        } else if (id == R.id.gotoLine) {
+            showGotoLineDialog();
+        } else if (id == R.id.changeSyntax) {
+            _syntaxSelection();
+        } else if (id == R.id.preference) {
+            menuStyle();
+        } else if (id == R.id.save) {
+            String path = mSharedPreference.getString("path", "");
+            if (!path.isEmpty()) {
+                new WriteFileThread().execute(path);
+            }
+        } else if (id == R.id.delete_line) {
+            editView.deleteLine();
+            return true;
+        } else if (id == R.id.empty_line) {
+            editView.emptyLine();
+            return true;
+        } else if (id == R.id.replace_line) {
+            editView.replaceLine();
+            return true;
+        } else if (id == R.id.duplicate_line) {
+            editView.duplicateLine();
+            return true;
+        } else if (id == R.id.toggle_comment) {
+            editView.toggleComment();
+            return true;
+        } else if (id == R.id.copy_line) {
+            editView.copyLine();
+            return true;
+        } else if (id == R.id.cut_line) {
+            editView.cutLine();
+            return true;
+        } else if (id == R.id.convert_uppercase) {
+            editView.convertSelectionToUpperCase();
+            return true;
+        } else if (id == R.id.convert_lowercase) {
+            editView.convertSelectionToLowerCase();
+            return true;
+        } else if (id == R.id.increase_indent) {
+            editView.increaseIndent();
+            return true;
+        } else if (id == R.id.decrease_indent) {
+            editView.decreaseIndent();
+            return true;
         }
         return super.onOptionsItemSelected(item);
     }
@@ -463,11 +638,13 @@ public class MainActivity extends Activity {
 
     // read file
     class ReadFileThread extends AsyncTask<String, Integer, Boolean> {
+        private GapBuffer loadedBuffer;
 
         @Override
         protected void onPreExecute() {
             // TODO: Implement this method
             super.onPreExecute();
+            loadedBuffer = null;
             editView.setEditedMode(false);
             mHandler.sendEmptyMessage(0);
             mIndeterminateBar.setVisibility(View.VISIBLE);
@@ -475,21 +652,46 @@ public class MainActivity extends Activity {
 
         @Override
         protected Boolean doInBackground(String... params) {
-            // TODO: Implement this method
-            Path path = Paths.get(params[0]);
+            File file = new File(params[0]);
             try {
                 // detect the file charset
-                String charset = UniversalDetector.detectCharset(path.toFile());
-                if (charset != null)
-                    mDefaultCharset = Charset.forName(charset);
+                String charset = UniversalDetector.detectCharset(file);
+                if (charset != null) {
+                    try {
+                        mDefaultCharset = Charset.forName(charset);
+                    } catch (Exception e) {
+                        mDefaultCharset = StandardCharsets.UTF_8;
+                    }
+                } else {
+                    mDefaultCharset = StandardCharsets.UTF_8;
+                }
 
-                // FIXED: Read entire file as single string (avoids incremental appends/gap shifts)
-                String fullText = readFile(path.toString());
+                // Read bytes
+                byte[] bytes = new byte[(int) file.length()];
+                try (InputStream fis = new java.io.FileInputStream(file)) {
+                    int offset = 0;
+                    while (offset < bytes.length) {
+                        int count = fis.read(bytes, offset, bytes.length - offset);
+                        if (count < 0) break;
+                        offset += count;
+                    }
+                }
+
+                String fullText = new String(bytes, mDefaultCharset);
+
+                // Detect line separator
+                if (fullText.contains("\r\n")) {
+                    mLineSeparator = "\r\n";
+                } else if (fullText.contains("\r")) {
+                    mLineSeparator = "\r";
+                } else {
+                    mLineSeparator = "\n";
+                }
+                
+                mFileModifiedManually = false;
 
                 // Replace buffer wholesale (like setText, but async)
-                GapBuffer newBuffer = new GapBuffer(fullText);
-                editView.setBuffer(newBuffer); // Assumes mTextView is your EditView; adjust if
-                // needed
+                loadedBuffer = new GapBuffer(fullText);
 
             } catch (Exception e) {
                 e.printStackTrace();
@@ -503,6 +705,9 @@ public class MainActivity extends Activity {
         protected void onPostExecute(Boolean result) {
             // TODO: Implement this method
             super.onPostExecute(result);
+            if (result && loadedBuffer != null) {
+                editView.setBuffer(loadedBuffer);
+            }
             editView.setEditedMode(true);
             mHandler.sendEmptyMessage(0);
             mIndeterminateBar.setVisibility(View.GONE);
@@ -514,18 +719,22 @@ public class MainActivity extends Activity {
 
         @Override
         protected Boolean doInBackground(String... params) {
-            // TODO: Implement this method
-            Path path = Paths.get(params[0]);
-
+            File file = new File(params[0]);
             try {
-                BufferedWriter bufferWrite = null;
-                bufferWrite = Files.newBufferedWriter(path, mDefaultCharset,
-                        StandardOpenOption.WRITE);
-                bufferWrite.write(editView.getBuffer().toString());
-                bufferWrite.flush();
-                bufferWrite.close();
+                String content = editView.getBuffer().toString();
+                if (!"\n".equals(mLineSeparator)) {
+                    content = content.replace("\n", mLineSeparator);
+                }
+
+                try (java.io.FileOutputStream fos = new java.io.FileOutputStream(file);
+                     java.io.OutputStreamWriter osw = new java.io.OutputStreamWriter(fos, mDefaultCharset)) {
+                    osw.write(content);
+                    osw.flush();
+                }
+                mFileModifiedManually = false;
             } catch (Exception e) {
                 e.printStackTrace();
+                return false;
             }
             return true;
         }
@@ -605,19 +814,16 @@ public class MainActivity extends Activity {
                 popup.setOnMenuItemClickListener(new PopupMenu.OnMenuItemClickListener() {
                     public boolean onMenuItemClick(MenuItem item) {
                         int id = item.getItemId();
-                        switch (id) {
-                            case R.id.search_option_regex:
-                                // to do
-                                break;
-                            case R.id.search_option_whole_word:
-                                // to do
-                                break;
-                            case R.id.search_option_match_case:
-                                // to do
-                                break;
-                            case R.id.close_search_options:
-                                search_pad.setVisibility(View.GONE);
-                                break;
+                        if (id == R.id.search_option_regex) {
+                            // to do
+                        } else if (id == R.id.search_option_whole_word) {
+                            // to do
+                        } else if (id == R.id.search_option_match_case) {
+                            // to do
+                        } else if (id == R.id.close_search_options) {
+                            search_pad.setVisibility(View.GONE);
+                            edittext_find.setText("");
+                            editView.find("");
                         }
                         return true;
                     }

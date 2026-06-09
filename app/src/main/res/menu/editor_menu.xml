@@ -80,22 +80,91 @@
 				android:id="@+id/search"
 				android:icon="@drawable/ic_search_dark"
 				android:title="Search" />
-			
+
             <item
                 android:id="@+id/gotoLine"
                 android:icon="@drawable/ic_jump_line"
                 android:title="Jump to line" />
+            <item
+                android:id="@+id/prev_pos"
+                android:icon="@drawable/ic_left_arrow"
+                android:title="Previous position" />
+            <item
+                android:id="@+id/next_pos"
+                android:icon="@drawable/ic_right_arrow"
+                android:title="Next position" />
             <group android:checkableBehavior="all">
                 <item
                     android:id="@+id/read_only"
                     android:icon="@drawable/ic_eye"
                     android:checked="false"
                     android:title="Read-only mode" />
+                <item
+                    android:id="@+id/word_wrap"
+                    android:checked="false"
+                    android:title="Word wrap" />
+                <item
+                    android:id="@+id/auto_complete"
+                    android:checked="true"
+                    android:title="Auto-complete" />
+                <item
+                    android:id="@+id/show_line_numbers"
+                    android:checked="true"
+                    android:title="Show line numbers" />
+                <item
+                    android:id="@+id/sticky_line_numbers"
+                    android:checked="true"
+                    android:title="Sticky line numbers" />
+                <item
+                    android:id="@+id/show_indent_guides"
+                    android:checked="true"
+                    android:title="Indent guides" />
+                <item
+                    android:id="@+id/show_wrap_arrows"
+                    android:checked="true"
+                    android:title="Show wrap arrows" />
+                <item
+                    android:id="@+id/auto_indent"
+                    android:checked="true"
+                    android:title="Auto indent" />
             </group>
 			<item
                 android:id="@+id/changeSyntax"
                 android:icon="@drawable/ic_syntax"
                 android:title="Syntax" />
+            <item
+                android:id="@+id/line_break"
+                android:title="Line break">
+                <menu>
+                    <group android:checkableBehavior="single">
+                        <item
+                            android:id="@+id/eol_unix"
+                            android:title="Unix-like (LF)" />
+                        <item
+                            android:id="@+id/eol_windows"
+                            android:title="Windows (CRLF)" />
+                        <item
+                            android:id="@+id/eol_mac"
+                            android:title="Mac OS (CR)" />
+                    </group>
+                </menu>
+            </item>
+            <item
+                android:id="@+id/encoding"
+                android:title="Encoding">
+                <menu>
+                    <group android:checkableBehavior="single">
+                        <item android:id="@+id/enc_utf8" android:title="UTF-8" />
+                        <item android:id="@+id/enc_utf16le" android:title="UTF-16LE" />
+                        <item android:id="@+id/enc_utf16be" android:title="UTF-16BE" />
+                        <item android:id="@+id/enc_gbk" android:title="GBK" />
+                        <item android:id="@+id/enc_big5" android:title="Big5" />
+                        <item android:id="@+id/enc_win1251" android:title="Windows-1251" />
+                        <item android:id="@+id/enc_win1252" android:title="Windows-1252" />
+                        <item android:id="@+id/enc_win1258" android:title="Windows-1258" />
+                    </group>
+                </menu>
+            </item>
             <item
                 android:id="@+id/preference"
                 android:icon="@drawable/ic_setting"
