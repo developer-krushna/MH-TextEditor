@@ -1,5 +1,5 @@
 # 📝 MH-TextEditor
-
+[![Android CI](https://github.com/developer-krushna/MH-TextEditor/actions/workflows/android.yml/badge.svg)](https://github.com/developer-krushna/MH-TextEditor/actions/workflows/android.yml)
 A powerful, lightweight text editor for Android with syntax highlighting, smooth editing experience, and professional code editing features.
 
 > ⚠️ **Note:** This editor may not fully support some Android keyboards yet.  
