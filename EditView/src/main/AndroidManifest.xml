@@ -2,8 +2,8 @@
 <!--
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 ~    MH-TextEditor - An Advanced and optimized TextEditor for android
-~    https://github.com/developer-krushna/AXMLPrinter
-~    Copyright (C) 2025  developer-krushna
+~    https://github.com/developer-krushna/MH-TextEditor
+~    Copyright (C) 2025-2026  developer-krushna
 ~
 ~     This library is free software; you can redistribute it and/or
 ~     modify it under the terms of the GNU Lesser General Public
@@ -24,8 +24,7 @@
 ~     additional information or have any questions
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 -->
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="modder.hub.editor" >
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-sdk android:minSdkVersion="23" />
 
