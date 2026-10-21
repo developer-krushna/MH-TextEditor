@@ -100,15 +100,8 @@ import modder.hub.editor.utils.LineHeightManager;
 import modder.hub.editor.utils.ScreenUtils;
 
 /* Author : Krushna Chandra Maharna(@developer-krushna)
-   This project was actually started by someone using gap buffer
-   But i forgot his name and his repository link because I was started
-   working on this project in 2024 . During that time due to some personal problem
-   I closed this project and saved it in sdcard for future task .
-   But unfortunately i unable to save the original author name. I am really sorry.
-   But if you are the creator then please let me know so that i can update this
-   part. Thank You
-
-   Optimization , code refactoring and comments are made by AI
+   This project was actually started by @jarko88 (https://github.com/jarko88/textview) . Thank You
+   Code optimization and comments are made by AI
    @Radhe Radhe
 */
 
